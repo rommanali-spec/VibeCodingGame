@@ -17,6 +17,12 @@ let platforms = []; // Array of platform objects
 let lastSwapTime = 0;
 let spaceKeyPressed = false; // Track Space key state for edge detection
 
+// Swap failed message state
+let swapFailedMessage = {
+    visible: false,
+    hideTime: 0
+};
+
 // Game constants
 const CANVAS_WIDTH = 640;
 const CANVAS_HEIGHT = 360;
@@ -24,7 +30,7 @@ const GRAVITY_LIGHT = 0.8;
 const GRAVITY_DARK = 0.6; // Reduced gravity in dark world (75% of light)
 const PLAYER_SPEED = 5;
 const JUMP_FORCE = -15;
-const SWAP_COOLDOWN_MS = 300;
+const SWAP_COOLDOWN_MS = 500;
 
 // Player object
 const player = {
@@ -162,19 +168,27 @@ function resolveVerticalCollision(newY, activePlatforms) {
     return newY; // No collision, use new position
 }
 
-// Core world swapping function
+// Core world swapping function with safe-swap check
 function swapWorld() {
-    // Toggle between light and dark
-    if (currentWorld === 'light') {
-        currentWorld = 'dark';
-    } else {
-        currentWorld = 'light';
+    // Determine target world
+    const targetWorld = currentWorld === 'light' ? 'dark' : 'light';
+    
+    // Check if swap would be safe (no overlap with solid objects)
+    if (!canSwapToWorld(targetWorld)) {
+        // Swap would cause overlap - show failed message and abort
+        showSwapFailedMessage();
+        console.log('Swap failed - would overlap with solid object');
+        return false; // Swap failed
     }
     
-    // Record swap time for cooldown
+    // Safe to swap - toggle world
+    currentWorld = targetWorld;
+    
+    // Record swap time for cooldown (only on successful swap)
     lastSwapTime = Date.now();
     
     console.log('Swapped to:', currentWorld);
+    return true; // Swap succeeded
 }
 
 // Check if world swapping is available (not in cooldown)
@@ -192,6 +206,43 @@ function getSwapCooldownRemaining() {
 // Get current world's gravity value
 function getCurrentGravity() {
     return currentWorld === 'light' ? GRAVITY_LIGHT : GRAVITY_DARK;
+}
+
+// Get all solid AABBs (axis-aligned bounding boxes) for a given world
+// Currently returns platforms; structured to easily add hazards/doors/levers later
+function getSolidAABBsForWorld(world) {
+    return platforms.filter(platform => 
+        platform.world === 'both' || platform.world === world
+    );
+}
+
+// Check if player can safely swap to target world (no overlap with solid objects)
+function canSwapToWorld(targetWorld) {
+    // Get player's current rectangle
+    const playerRect = {
+        x: player.x,
+        y: player.y,
+        width: player.width,
+        height: player.height
+    };
+    
+    // Get all solid objects that would be active in target world
+    const solidObjects = getSolidAABBsForWorld(targetWorld);
+    
+    // Check for overlaps (not just touching at edges)
+    for (const solid of solidObjects) {
+        if (rectanglesOverlap(playerRect, solid)) {
+            return false; // Overlap found - swap would be unsafe
+        }
+    }
+    
+    return true; // No overlaps - swap is safe
+}
+
+// Show "Swap Failed" message
+function showSwapFailedMessage() {
+    swapFailedMessage.visible = true;
+    swapFailedMessage.hideTime = Date.now() + 1000; // Hide after 1000ms
 }
 
 // Initialize the game
@@ -368,6 +419,9 @@ function render() {
     
     // Developer debug overlay
     renderDebugOverlay();
+    
+    // Render swap failed message if visible
+    renderSwapFailedMessage();
 }
 
 // Render platforms based on current world
@@ -419,6 +473,31 @@ function renderDebugOverlay() {
     // Current gravity (for reference)
     const currentGrav = getCurrentGravity();
     ctx.fillText(`Gravity: ${currentGrav}`, 10, 120);
+}
+
+// Render "Swap Failed" message when visible
+function renderSwapFailedMessage() {
+    // Update message visibility based on time
+    if (swapFailedMessage.visible && Date.now() >= swapFailedMessage.hideTime) {
+        swapFailedMessage.visible = false;
+    }
+    
+    // Render message if visible
+    if (swapFailedMessage.visible) {
+        ctx.fillStyle = '#FF4444';
+        ctx.font = 'bold 24px Arial';
+        ctx.textAlign = 'center';
+        
+        // Draw text with white outline for visibility
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 4;
+        ctx.strokeText('Swap Failed', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+        
+        ctx.fillText('Swap Failed', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+        
+        // Reset text alignment
+        ctx.textAlign = 'left';
+    }
 }
 
 // Initialize when DOM is loaded
