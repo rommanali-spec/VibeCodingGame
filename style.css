@@ -91,6 +91,59 @@ footer p {
     font-size: 0.9rem;
 }
 
+/* Game Canvas Styles */
+#game-canvas {
+    display: block;
+    margin: 20px auto;
+    border: 2px solid #333;
+    background: #87CEEB;
+    image-rendering: pixelated; /* For retro pixel art look */
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+}
+
+/* Game mode - full screen letterbox effect */
+body.game-mode {
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+}
+
+body.game-mode header,
+body.game-mode footer {
+    display: none;
+}
+
+body.game-mode main {
+    flex: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0;
+}
+
+body.game-mode #app {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+    max-width: none;
+    width: auto;
+}
+
+body.game-mode #game-canvas {
+    margin: 0;
+    max-width: 100vw;
+    max-height: 100vh;
+    width: auto;
+    height: auto;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
     header h1 {
@@ -100,6 +153,19 @@ footer p {
     #app {
         margin: 1rem;
         padding: 2rem;
+    }
+    
+    body.game-mode #game-canvas {
+        width: 100vw;
+        height: calc(100vw * 360 / 640); /* Maintain 16:9 aspect ratio */
+    }
+    
+    /* If height would be too tall, fit by height instead */
+    @media (max-height: 400px) {
+        body.game-mode #game-canvas {
+            width: calc(100vh * 640 / 360);
+            height: 100vh;
+        }
     }
 }
 
