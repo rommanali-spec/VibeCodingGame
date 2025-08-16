@@ -13,12 +13,18 @@ let currentScale = 1;
 let currentWorld = 'light'; // Current active world: 'light' or 'dark'
 let platforms = []; // Array of platform objects
 
+// World swapping state
+let lastSwapTime = 0;
+let spaceKeyPressed = false; // Track Space key state for edge detection
+
 // Game constants
 const CANVAS_WIDTH = 640;
 const CANVAS_HEIGHT = 360;
-const GRAVITY = 0.8;
+const GRAVITY_LIGHT = 0.8;
+const GRAVITY_DARK = 0.6; // Reduced gravity in dark world (75% of light)
 const PLAYER_SPEED = 5;
 const JUMP_FORCE = -15;
+const SWAP_COOLDOWN_MS = 300;
 
 // Player object
 const player = {
@@ -36,8 +42,7 @@ const player = {
 const keys = {
     a: false,
     d: false,
-    w: false,
-    space: false
+    w: false
 };
 
 // Calculate the best integer scale factor for the current window size
@@ -157,10 +162,36 @@ function resolveVerticalCollision(newY, activePlatforms) {
     return newY; // No collision, use new position
 }
 
-// Switch between light and dark worlds (temporary for testing)
-function switchWorld() {
-    currentWorld = currentWorld === 'light' ? 'dark' : 'light';
-    console.log('Switched to:', currentWorld);
+// Core world swapping function
+function swapWorld() {
+    // Toggle between light and dark
+    if (currentWorld === 'light') {
+        currentWorld = 'dark';
+    } else {
+        currentWorld = 'light';
+    }
+    
+    // Record swap time for cooldown
+    lastSwapTime = Date.now();
+    
+    console.log('Swapped to:', currentWorld);
+}
+
+// Check if world swapping is available (not in cooldown)
+function canSwapWorld() {
+    const timeSinceLastSwap = Date.now() - lastSwapTime;
+    return timeSinceLastSwap >= SWAP_COOLDOWN_MS;
+}
+
+// Get remaining cooldown time in ms
+function getSwapCooldownRemaining() {
+    const timeSinceLastSwap = Date.now() - lastSwapTime;
+    return Math.max(0, SWAP_COOLDOWN_MS - timeSinceLastSwap);
+}
+
+// Get current world's gravity value
+function getCurrentGravity() {
+    return currentWorld === 'light' ? GRAVITY_LIGHT : GRAVITY_DARK;
 }
 
 // Initialize the game
@@ -183,6 +214,18 @@ function init() {
 function setupKeyboardControls() {
     document.addEventListener('keydown', (e) => {
         const key = e.key.toLowerCase();
+        
+        // Handle Space key for world swapping (edge detection)
+        if (e.code === 'Space') {
+            if (!spaceKeyPressed && canSwapWorld()) {
+                swapWorld();
+            }
+            spaceKeyPressed = true;
+            e.preventDefault();
+            return;
+        }
+        
+        // Handle movement keys
         if (key in keys) {
             keys[key] = true;
             e.preventDefault();
@@ -191,6 +234,15 @@ function setupKeyboardControls() {
     
     document.addEventListener('keyup', (e) => {
         const key = e.key.toLowerCase();
+        
+        // Handle Space key release
+        if (e.code === 'Space') {
+            spaceKeyPressed = false;
+            e.preventDefault();
+            return;
+        }
+        
+        // Handle movement key releases
         if (key in keys) {
             keys[key] = false;
             e.preventDefault();
@@ -254,14 +306,8 @@ function updatePlayer() {
         player.onGround = false;
     }
     
-    // Handle world switching (temporary - for testing)
-    if (keys.space) {
-        switchWorld();
-        keys.space = false; // Prevent rapid switching
-    }
-    
-    // Apply gravity
-    player.velocityY += GRAVITY;
+    // Apply gravity (world-specific)
+    player.velocityY += getCurrentGravity();
     
     // Get active platforms for collision detection
     const activePlatforms = getActivePlatforms();
@@ -318,8 +364,10 @@ function render() {
     // Draw controls and world info
     ctx.fillStyle = '#2D3436';
     ctx.font = '16px Arial';
-    ctx.fillText('Controls: A (left), D (right), W (jump)', 10, 30);
-    ctx.fillText(`Current World: ${currentWorld} (SPACE to switch)`, 10, 50);
+    ctx.fillText('Controls: A (left), D (right), W (jump), SPACE (swap world)', 10, 30);
+    
+    // Developer debug overlay
+    renderDebugOverlay();
 }
 
 // Render platforms based on current world
@@ -350,6 +398,27 @@ function renderPlatforms() {
         ctx.lineWidth = 1;
         ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
     }
+}
+
+// Developer debug overlay (temporary for testing)
+function renderDebugOverlay() {
+    ctx.fillStyle = '#2D3436';
+    ctx.font = '14px Arial';
+    
+    // Current world
+    ctx.fillText(`World: ${currentWorld}`, 10, 80);
+    
+    // Cooldown status
+    const cooldownRemaining = getSwapCooldownRemaining();
+    if (cooldownRemaining > 0) {
+        ctx.fillText(`Swap CD: ${cooldownRemaining}ms`, 10, 100);
+    } else {
+        ctx.fillText('Swap CD: ready', 10, 100);
+    }
+    
+    // Current gravity (for reference)
+    const currentGrav = getCurrentGravity();
+    ctx.fillText(`Gravity: ${currentGrav}`, 10, 120);
 }
 
 // Initialize when DOM is loaded
