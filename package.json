@@ -1,0 +1,25 @@
+{
+  "name": "vibe-coding-game",
+  "version": "1.0.0",
+  "description": "An interactive coding game experience",
+  "main": "script.js",
+  "scripts": {
+    "start": "npx live-server --port=3000 --open=/index.html",
+    "dev": "npx live-server --port=3000 --open=/index.html --watch=.",
+    "build": "echo 'No build process needed for vanilla HTML/JS'",
+    "test": "echo 'No tests specified yet'"
+  },
+  "keywords": [
+    "game",
+    "coding",
+    "javascript",
+    "html",
+    "interactive"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  }
+}
+
