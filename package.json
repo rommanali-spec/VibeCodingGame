@@ -7,10 +7,7 @@
     "start": "npx live-server --port=3000 --open=/index.html",
     "dev": "npx live-server --port=3000 --open=/index.html --watch=.",
     "build": "echo 'No build process needed for vanilla HTML/JS'",
-    "test": "echo 'No tests specified yet'",
-    "deploy": "./deploy.sh",
-    "deploy:message": "./deploy.sh \"$npm_config_message\"",
-    "quick-deploy": "git add . && git commit -m \"Quick deploy: $(date '+%Y-%m-%d %H:%M:%S')\" && git push origin main"
+    "test": "echo 'No tests specified yet'"
   },
   "keywords": [
     "game",
