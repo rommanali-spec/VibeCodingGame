@@ -10,12 +10,13 @@ const ctx = canvas.getContext('2d');
 let gameStarted = false;
 let animationId = null;
 let currentScale = 1;
+let currentWorld = 'light'; // Current active world: 'light' or 'dark'
+let platforms = []; // Array of platform objects
 
 // Game constants
 const CANVAS_WIDTH = 640;
 const CANVAS_HEIGHT = 360;
 const GRAVITY = 0.8;
-const GROUND_Y = CANVAS_HEIGHT - 30; // Ground level (canvas height - ground thickness)
 const PLAYER_SPEED = 5;
 const JUMP_FORCE = -15;
 
@@ -35,7 +36,8 @@ const player = {
 const keys = {
     a: false,
     d: false,
-    w: false
+    w: false,
+    space: false
 };
 
 // Calculate the best integer scale factor for the current window size
@@ -63,6 +65,102 @@ function applyCanvasScale() {
     canvas.style.height = scaledHeight + 'px';
     
     console.log(`Canvas scaled to ${scale}x (${scaledWidth}×${scaledHeight})`);
+}
+
+// Load test platforms for development
+function loadTestPlatforms() {
+    platforms = [
+        // Wide ground platform (both worlds)
+        { id: 'ground', x: 0, y: 320, width: 640, height: 40, world: 'both' },
+        // Light world platform (mid-height)
+        { id: 'light-platform', x: 120, y: 260, width: 140, height: 12, world: 'light' },
+        // Dark world platform (mid-height)
+        { id: 'dark-platform', x: 360, y: 220, width: 140, height: 12, world: 'dark' },
+        // Additional test platforms
+        { id: 'light-upper', x: 50, y: 180, width: 100, height: 12, world: 'light' },
+        { id: 'dark-upper', x: 490, y: 160, width: 100, height: 12, world: 'dark' }
+    ];
+    console.log('Test platforms loaded:', platforms.length);
+}
+
+// Get platforms that are active in the current world
+function getActivePlatforms() {
+    return platforms.filter(platform => 
+        platform.world === 'both' || platform.world === currentWorld
+    );
+}
+
+// Check if two rectangles overlap
+function rectanglesOverlap(rect1, rect2) {
+    return rect1.x < rect2.x + rect2.width &&
+           rect1.x + rect1.width > rect2.x &&
+           rect1.y < rect2.y + rect2.height &&
+           rect1.y + rect1.height > rect2.y;
+}
+
+// Resolve horizontal collision with platforms
+function resolveHorizontalCollision(newX, activePlatforms) {
+    const playerRect = {
+        x: newX,
+        y: player.y,
+        width: player.width,
+        height: player.height
+    };
+    
+    for (const platform of activePlatforms) {
+        if (rectanglesOverlap(playerRect, platform)) {
+            // Moving right, hit left side of platform
+            if (player.velocityX > 0) {
+                player.x = platform.x - player.width;
+                player.velocityX = 0;
+                return player.x;
+            }
+            // Moving left, hit right side of platform
+            else if (player.velocityX < 0) {
+                player.x = platform.x + platform.width;
+                player.velocityX = 0;
+                return player.x;
+            }
+        }
+    }
+    
+    return newX; // No collision, use new position
+}
+
+// Resolve vertical collision with platforms
+function resolveVerticalCollision(newY, activePlatforms) {
+    const playerRect = {
+        x: player.x,
+        y: newY,
+        width: player.width,
+        height: player.height
+    };
+    
+    for (const platform of activePlatforms) {
+        if (rectanglesOverlap(playerRect, platform)) {
+            // Moving down, landing on top of platform
+            if (player.velocityY > 0) {
+                player.y = platform.y - player.height;
+                player.velocityY = 0;
+                player.onGround = true;
+                return player.y;
+            }
+            // Moving up, hitting bottom of platform (head bump)
+            else if (player.velocityY < 0) {
+                player.y = platform.y + platform.height;
+                player.velocityY = 0;
+                return player.y;
+            }
+        }
+    }
+    
+    return newY; // No collision, use new position
+}
+
+// Switch between light and dark worlds (temporary for testing)
+function switchWorld() {
+    currentWorld = currentWorld === 'light' ? 'dark' : 'light';
+    console.log('Switched to:', currentWorld);
 }
 
 // Initialize the game
@@ -118,6 +216,9 @@ function startGame() {
     // Apply integer scaling
     applyCanvasScale();
     
+    // Load test platforms
+    loadTestPlatforms();
+    
     // Start game loop
     gameLoop();
 }
@@ -136,9 +237,9 @@ function gameLoop() {
     animationId = requestAnimationFrame(gameLoop);
 }
 
-// Update player physics and movement
+// Update player physics and movement with platform collision
 function updatePlayer() {
-    // Handle horizontal movement
+    // Handle horizontal movement input
     if (keys.a) {
         player.velocityX = -PLAYER_SPEED;
     } else if (keys.d) {
@@ -153,36 +254,47 @@ function updatePlayer() {
         player.onGround = false;
     }
     
-    // Apply gravity
-    if (!player.onGround) {
-        player.velocityY += GRAVITY;
+    // Handle world switching (temporary - for testing)
+    if (keys.space) {
+        switchWorld();
+        keys.space = false; // Prevent rapid switching
     }
     
-    // Update position
-    player.x += player.velocityX;
-    player.y += player.velocityY;
+    // Apply gravity
+    player.velocityY += GRAVITY;
+    
+    // Get active platforms for collision detection
+    const activePlatforms = getActivePlatforms();
+    
+    // Reset ground state (will be set to true if landing on platform)
+    player.onGround = false;
+    
+    // TWO-PASS COLLISION RESOLUTION:
+    
+    // 1) Horizontal pass: move horizontally and resolve collisions
+    const newX = player.x + player.velocityX;
     
     // Keep player within horizontal bounds
-    if (player.x < 0) {
-        player.x = 0;
-    } else if (player.x + player.width > CANVAS_WIDTH) {
-        player.x = CANVAS_WIDTH - player.width;
+    let clampedX = Math.max(0, Math.min(newX, CANVAS_WIDTH - player.width));
+    if (clampedX !== newX) {
+        player.velocityX = 0; // Hit screen boundary
     }
     
-    // Ground collision
-    if (player.y + player.height >= GROUND_Y) {
-        player.y = GROUND_Y - player.height;
-        player.velocityY = 0;
-        player.onGround = true;
-    } else {
-        player.onGround = false;
-    }
+    // Resolve horizontal platform collisions
+    player.x = resolveHorizontalCollision(clampedX, activePlatforms);
     
-    // Prevent falling off bottom (safety check)
+    // 2) Vertical pass: move vertically and resolve collisions
+    const newY = player.y + player.velocityY;
+    
+    // Resolve vertical platform collisions
+    player.y = resolveVerticalCollision(newY, activePlatforms);
+    
+    // Safety check: prevent falling off bottom of screen
     if (player.y > CANVAS_HEIGHT) {
         player.y = 100;
         player.x = 100;
         player.velocityY = 0;
+        player.onGround = false;
     }
 }
 
@@ -191,9 +303,8 @@ function render() {
     // Clear canvas
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     
-    // Draw ground
-    ctx.fillStyle = '#654321';
-    ctx.fillRect(0, GROUND_Y, CANVAS_WIDTH, CANVAS_HEIGHT - GROUND_Y);
+    // Draw platforms
+    renderPlatforms();
     
     // Draw player
     ctx.fillStyle = player.color;
@@ -204,10 +315,41 @@ function render() {
     ctx.lineWidth = 2;
     ctx.strokeRect(player.x, player.y, player.width, player.height);
     
-    // Draw controls instructions
+    // Draw controls and world info
     ctx.fillStyle = '#2D3436';
     ctx.font = '16px Arial';
     ctx.fillText('Controls: A (left), D (right), W (jump)', 10, 30);
+    ctx.fillText(`Current World: ${currentWorld} (SPACE to switch)`, 10, 50);
+}
+
+// Render platforms based on current world
+function renderPlatforms() {
+    const activePlatforms = getActivePlatforms();
+    
+    for (const platform of activePlatforms) {
+        // Set color based on world type
+        switch (platform.world) {
+            case 'both':
+                ctx.fillStyle = '#808080'; // Neutral gray
+                break;
+            case 'light':
+                ctx.fillStyle = '#E6D56E'; // Warm yellowish
+                break;
+            case 'dark':
+                ctx.fillStyle = '#8E7BB8'; // Cool purplish
+                break;
+            default:
+                ctx.fillStyle = '#CCCCCC'; // Fallback gray
+        }
+        
+        // Draw platform
+        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+        
+        // Draw platform border for clarity
+        ctx.strokeStyle = '#333333';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
+    }
 }
 
 // Initialize when DOM is loaded
