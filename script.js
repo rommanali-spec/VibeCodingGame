@@ -9,6 +9,7 @@ const ctx = canvas.getContext('2d');
 // Game state
 let gameStarted = false;
 let animationId = null;
+let currentScale = 1;
 
 // Game constants
 const CANVAS_WIDTH = 640;
@@ -37,6 +38,33 @@ const keys = {
     w: false
 };
 
+// Calculate the best integer scale factor for the current window size
+function calculateScale() {
+    const margin = 40; // Leave some margin around the canvas
+    const maxWidth = window.innerWidth - margin;
+    const maxHeight = window.innerHeight - margin;
+    
+    const scaleX = Math.floor(maxWidth / CANVAS_WIDTH);
+    const scaleY = Math.floor(maxHeight / CANVAS_HEIGHT);
+    
+    // Use the smaller scale factor to ensure it fits in both dimensions
+    return Math.max(1, Math.min(scaleX, scaleY));
+}
+
+// Apply scaling to the canvas
+function applyCanvasScale() {
+    const scale = calculateScale();
+    currentScale = scale;
+    
+    const scaledWidth = CANVAS_WIDTH * scale;
+    const scaledHeight = CANVAS_HEIGHT * scale;
+    
+    canvas.style.width = scaledWidth + 'px';
+    canvas.style.height = scaledHeight + 'px';
+    
+    console.log(`Canvas scaled to ${scale}x (${scaledWidth}×${scaledHeight})`);
+}
+
 // Initialize the game
 function init() {
     console.log('Vibe Coding Game initialized!');
@@ -44,6 +72,13 @@ function init() {
     // Add event listeners
     startBtn.addEventListener('click', startGame);
     setupKeyboardControls();
+    
+    // Add window resize handler
+    window.addEventListener('resize', () => {
+        if (gameStarted) {
+            applyCanvasScale();
+        }
+    });
 }
 
 // Setup keyboard event listeners
@@ -79,6 +114,9 @@ function startGame() {
     document.body.classList.add('game-mode');
     app.classList.add('game-mode');
     canvas.style.display = 'block';
+    
+    // Apply integer scaling
+    applyCanvasScale();
     
     // Start game loop
     gameLoop();

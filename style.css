@@ -100,6 +100,8 @@ footer p {
     image-rendering: pixelated; /* For retro pixel art look */
     image-rendering: -moz-crisp-edges;
     image-rendering: crisp-edges;
+    image-rendering: -webkit-crisp-edges;
+    image-rendering: -o-crisp-edges;
 }
 
 /* Game mode - full screen letterbox effect */
@@ -112,6 +114,7 @@ body.game-mode {
     min-height: 100vh;
     margin: 0;
     padding: 0;
+    overflow: hidden; /* Hide scrollbars */
 }
 
 body.game-mode header,
@@ -125,6 +128,8 @@ body.game-mode main {
     justify-content: center;
     align-items: center;
     padding: 0;
+    width: 100vw;
+    height: 100vh;
 }
 
 body.game-mode #app {
@@ -134,17 +139,24 @@ body.game-mode #app {
     box-shadow: none;
     max-width: none;
     width: auto;
+    height: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 body.game-mode #game-canvas {
     margin: 0;
-    max-width: 100vw;
-    max-height: 100vh;
-    width: auto;
-    height: auto;
+    border: none;
+    /* Size will be set dynamically by JavaScript */
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+    image-rendering: -webkit-crisp-edges;
+    image-rendering: -o-crisp-edges;
 }
 
-/* Responsive design */
+/* Responsive design for menu/non-game elements */
 @media (max-width: 768px) {
     header h1 {
         font-size: 2rem;
@@ -153,19 +165,6 @@ body.game-mode #game-canvas {
     #app {
         margin: 1rem;
         padding: 2rem;
-    }
-    
-    body.game-mode #game-canvas {
-        width: 100vw;
-        height: calc(100vw * 360 / 640); /* Maintain 16:9 aspect ratio */
-    }
-    
-    /* If height would be too tall, fit by height instead */
-    @media (max-height: 400px) {
-        body.game-mode #game-canvas {
-            width: calc(100vh * 640 / 360);
-            height: 100vh;
-        }
     }
 }
 
