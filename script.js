@@ -54,9 +54,13 @@ let physicsDebug = {
 // Game constants
 const CANVAS_WIDTH = 640;
 const CANVAS_HEIGHT = 360;
-const GRAVITY_LIGHT = 0.8;
-const GRAVITY_DARK = 0.6; // Reduced gravity in dark world (75% of light)
-const PLAYER_SPEED = 5;
+
+// World-specific movement traits
+const LIGHT_SPEED = 4;           // Light world horizontal speed (pixels per frame)
+const DARK_SPEED = 3;            // Dark world horizontal speed (pixels per frame)
+const LIGHT_GRAVITY = 0.8;       // Light world gravity
+const DARK_GRAVITY = 0.6;        // Dark world gravity (75% of light gravity)
+
 const JUMP_FORCE = -15;
 const SWAP_COOLDOWN_MS = 500;
 const COLLISION_EPS = 0.001; // Numerical stability epsilon
@@ -391,6 +395,15 @@ function loadBestTime(levelIndex) {
     }
 }
 
+// World-specific movement trait functions
+function getCurrentSpeed() {
+    return currentWorld === 'light' ? LIGHT_SPEED : DARK_SPEED;
+}
+
+function getCurrentGravity() {
+    return currentWorld === 'light' ? LIGHT_GRAVITY : DARK_GRAVITY;
+}
+
 // Resolve horizontal collision with all solids (platforms + movers)
 function resolveHorizontalCollision(newX, activeSolids) {
     const playerRect = {
@@ -672,6 +685,11 @@ function swapWorld() {
     // Safe to swap - toggle world
     currentWorld = targetWorld;
     
+    // Movement traits are automatically applied:
+    // - getCurrentSpeed() and getCurrentGravity() read from currentWorld
+    // - Next frame will use new world's speed/gravity values
+    // - Existing velocities preserved, but new input uses new world traits
+    
     // Record swap time for cooldown (only on successful swap)
     lastSwapTime = Date.now();
     
@@ -689,11 +707,6 @@ function canSwapWorld() {
 function getSwapCooldownRemaining() {
     const timeSinceLastSwap = Date.now() - lastSwapTime;
     return Math.max(0, SWAP_COOLDOWN_MS - timeSinceLastSwap);
-}
-
-// Get current world's gravity value
-function getCurrentGravity() {
-    return currentWorld === 'light' ? GRAVITY_LIGHT : GRAVITY_DARK;
 }
 
 // SINGLE SOURCE OF TRUTH: Get all solid AABBs for collision and safe-swap checks
@@ -973,11 +986,12 @@ function updatePlayer() {
     const level = LevelManager.getCurrent();
     
     // 3) READ INPUT AND INTEGRATE VELOCITIES
-    // Handle horizontal movement input
+    // Handle horizontal movement input (use current world's speed)
+    const worldSpeed = getCurrentSpeed();
     if (keys.a) {
-        player.velocityX = -PLAYER_SPEED;
+        player.velocityX = -worldSpeed;
     } else if (keys.d) {
-        player.velocityX = PLAYER_SPEED;
+        player.velocityX = worldSpeed;
     } else {
         player.velocityX = 0;
     }
