@@ -101,20 +101,8 @@ const LEVELS = [
                 id: 'level-exit',
                 type: 'exit',
                 x: 2320, y: 280, w: 20, h: 40,
-                world: 'both',
-                locked: false
+                world: 'both'
             }
-        ],
-
-        levers: [
-            // Empty for now - will be added in later steps
-        ],
-
-        stars: [
-            // 3 stars spread across the level
-            { id: 'star1', x: 250, y: 240, w: 16, h: 16, world: 'light' },
-            { id: 'star2', x: 1000, y: 120, w: 16, h: 16, world: 'dark' },
-            { id: 'star3', x: 1750, y: 180, w: 16, h: 16, world: 'both' }
         ]
     },
 
@@ -176,17 +164,8 @@ const LEVELS = [
                 id: 'level2-exit',
                 type: 'exit', 
                 x: 1720, y: 280, w: 20, h: 40,
-                world: 'both',
-                locked: false
+                world: 'both'
             }
-        ],
-
-        levers: [],
-
-        stars: [
-            { id: 'star2-1', x: 480, y: 260, w: 16, h: 16, world: 'light' },
-            { id: 'star2-2', x: 750, y: 160, w: 16, h: 16, world: 'both' },
-            { id: 'star2-3', x: 1450, y: 180, w: 16, h: 16, world: 'dark' }
         ]
     },
     
@@ -264,15 +243,7 @@ const LEVELS = [
         ],
         
         doors: [
-            { id: 'test-exit', type: 'exit', x: 3120, y: 280, w: 40, h: 52, world: 'both', locked: false }
-        ],
-        
-        levers: [],
-        
-        stars: [
-            { id: 'star-test-1', x: 300, y: 200, w: 16, h: 16, world: 'light' },
-            { id: 'star-test-2', x: 1175, y: 240, w: 16, h: 16, world: 'both' }, // On the island
-            { id: 'star-test-3', x: 2700, y: 180, w: 16, h: 16, world: 'dark' }
+            { id: 'test-exit', type: 'exit', x: 3120, y: 280, w: 40, h: 52, world: 'both' }
         ]
     }
 ];

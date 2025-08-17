@@ -17,8 +17,6 @@ let platforms = [];
 let movers = [];
 let spikes = [];
 let doors = [];
-let levers = [];
-let stars = [];
 
 // Level management
 let currentLevelIndex = 0;
@@ -134,8 +132,6 @@ const LevelManager = {
         movers = [];
         spikes = [];
         doors = [];
-        levers = [];
-        stars = [];
         
         // Set level state
         currentLevelIndex = index;
@@ -218,44 +214,19 @@ const LevelManager = {
         level.doors.forEach(door => {
             doors.push({
                 id: door.id,
-                type: door.type,
+                type: door.type, // Only 'exit' type supported
                 x: door.x,
                 y: door.y,
                 width: door.w,
                 height: door.h,
-                world: door.world,
-                locked: door.locked || false
-            });
-        });
-        
-        level.levers.forEach(lever => {
-            levers.push({
-                id: lever.id,
-                x: lever.x,
-                y: lever.y,
-                width: lever.w,
-                height: lever.h,
-                world: lever.world,
-                targets: lever.targets || []
-            });
-        });
-        
-        level.stars.forEach(star => {
-            stars.push({
-                id: star.id || `star_${stars.length}`,
-                x: star.x,
-                y: star.y,
-                width: star.w,
-                height: star.h,
-                world: star.world,
-                collected: false
+                world: door.world
             });
         });
         
         // Initialize camera
         this.updateCamera();
         
-        console.log(`Level loaded: ${platforms.length} platforms, ${movers.length} movers, ${spikes.length} spikes, ${doors.length} doors, ${stars.length} stars`);
+        console.log(`Level loaded: ${platforms.length} platforms, ${movers.length} movers, ${spikes.length} spikes, ${doors.length} doors`);
     },
     
     // Reset current level (death/manual reset)
@@ -278,18 +249,9 @@ const LevelManager = {
         player.velocityY = 0;
         player.onGround = false;
         
-        // Reset all toggled states to defaults
-        doors.forEach(door => {
-            const originalDoor = level.doors.find(d => d.id === door.id);
-            if (originalDoor) {
-                door.locked = originalDoor.locked || false;
-            }
-        });
+        // Exit doors don't need reset logic (no state to toggle)
         
-        // Reset stars
-        stars.forEach(star => {
-            star.collected = false;
-        });
+
         
         // Reset camera
         this.updateCamera();
@@ -1079,7 +1041,8 @@ function checkDoorInteractions() {
     );
     
     for (const door of activeDoors) {
-        if (rectanglesOverlap(playerRect, door) && door.type === 'exit' && !door.locked) {
+        // Exit door overlap check - immediate completion on touch
+        if (rectanglesOverlap(playerRect, door) && door.type === 'exit') {
             console.log('Player reached exit door - level complete');
             LevelManager.complete();
             return;
@@ -1105,7 +1068,6 @@ function render() {
     renderMovers(); 
     renderSpikes();
     renderDoors();
-    renderStars();
     
     // Draw player
     ctx.fillStyle = player.color;
@@ -1298,7 +1260,7 @@ function renderSpikes() {
     }
 }
 
-// Render doors based on current world (with culling)
+// Render exit doors based on current world (with culling)
 function renderDoors() {
     const activeDoors = doors.filter(door => 
         (door.world === 'both' || door.world === currentWorld) &&
@@ -1306,69 +1268,45 @@ function renderDoors() {
     );
     
     for (const door of activeDoors) {
-        // Set color based on lock state
-        if (door.locked) {
-            ctx.fillStyle = '#8B4513'; // Brown for locked
-        } else {
-            ctx.fillStyle = '#228B22'; // Green for unlocked
+        // Set exit door colors based on world
+        let fillColor, strokeColor;
+        switch (door.world) {
+            case 'light':
+                fillColor = '#32CD32';   // Bright green for light world exit
+                strokeColor = '#228B22'; // Darker green border
+                break;
+            case 'dark':
+                fillColor = '#9370DB';   // Purple for dark world exit
+                strokeColor = '#663399'; // Darker purple border
+                break;
+            case 'both':
+                fillColor = '#808080';   // Neutral grey for both-world exit
+                strokeColor = '#555555'; // Darker grey border
+                break;
+            default:
+                fillColor = '#228B22';   // Fallback green
+                strokeColor = '#006600';
         }
         
+        ctx.fillStyle = fillColor;
         ctx.fillRect(door.x, door.y, door.width, door.height);
         
         // Draw door border
-        ctx.strokeStyle = '#000000';
+        ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 2;
         ctx.strokeRect(door.x, door.y, door.width, door.height);
         
-        // Draw door handle
-        const handleX = door.x + door.width * 0.8;
-        const handleY = door.y + door.height * 0.5;
-        ctx.fillStyle = '#FFD700'; // Gold handle
-        ctx.beginPath();
-        ctx.arc(handleX, handleY, 3, 0, 2 * Math.PI);
-        ctx.fill();
+        // Draw exit indicator (arrow or symbol)
+        const centerX = door.x + door.width / 2;
+        const centerY = door.y + door.height / 2;
+        ctx.fillStyle = '#FFFFFF'; // White symbol
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('EXIT', centerX, centerY + 5);
     }
 }
 
-// Render stars based on current world (with culling)
-function renderStars() {
-    const activeStars = stars.filter(star => 
-        (star.world === 'both' || star.world === currentWorld) &&
-        isInViewport(star) &&
-        !star.collected
-    );
-    
-    for (const star of activeStars) {
-        // Draw star in gold
-        ctx.fillStyle = '#FFD700';
-        
-        // Draw simple star shape
-        const centerX = star.x + star.width / 2;
-        const centerY = star.y + star.height / 2;
-        const size = Math.min(star.width, star.height) / 2;
-        
-        ctx.beginPath();
-        for (let i = 0; i < 10; i++) {
-            const radius = i % 2 === 0 ? size : size * 0.5;
-            const angle = (i * Math.PI) / 5;
-            const x = centerX + Math.cos(angle) * radius;
-            const y = centerY + Math.sin(angle) * radius;
-            
-            if (i === 0) {
-                ctx.moveTo(x, y);
-            } else {
-                ctx.lineTo(x, y);
-            }
-        }
-        ctx.closePath();
-        ctx.fill();
-        
-        // Star border
-        ctx.strokeStyle = '#B8860B';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-    }
-}
+
 
 // Developer debug overlay (temporary for testing)
 function renderDebugOverlay() {
