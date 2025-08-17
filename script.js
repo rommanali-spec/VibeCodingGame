@@ -27,6 +27,11 @@ let levelStartMonotonic = 0;
 let levelRunMs = 0; // Accumulator for level run time (reset on load/reset, incremented each frame)
 let levelBestMs = null; // Current level's best time (loaded from localStorage)
 
+// Level completion state
+let levelCompleting = false; // True when level completion sequence is active
+let completionStartTime = 0; // When the completion sequence started
+let completionMessage = ''; // Message to display during completion
+
 // Camera system
 let camera = { x: 0, y: 0 };
 
@@ -150,6 +155,11 @@ const LevelManager = {
         levelRunMs = 0;
         levelBestMs = loadBestTime(index); // Read best time from localStorage
         
+        // Reset completion state
+        levelCompleting = false;
+        completionStartTime = 0;
+        completionMessage = '';
+        
         // Set spawn state
         currentWorld = level.spawn.world;
         player.x = level.spawn.x;
@@ -256,6 +266,11 @@ const LevelManager = {
         // Reset run timer (death/manual reset)
         levelRunMs = 0;
         
+        // Reset completion state
+        levelCompleting = false;
+        completionStartTime = 0;
+        completionMessage = '';
+        
         // Reset player to spawn
         currentWorld = level.spawn.world;
         player.x = level.spawn.x;
@@ -293,10 +308,20 @@ const LevelManager = {
             console.log(`New best time: ${formatTime(finalTime)}`);
         }
         
-        // TODO: Add level advancement logic here in next steps
+        // Start completion sequence
+        levelCompleting = true;
+        completionStartTime = performance.now();
         
-        // For now, just restart the current level
-        this.reset();
+        // Set completion message based on whether there are more levels
+        if (currentLevelIndex >= LEVELS.length - 1) {
+            completionMessage = 'YOU WIN!';
+        } else {
+            completionMessage = 'LEVEL COMPLETE';
+        }
+        
+        // Stop player physics
+        player.velocityX = 0;
+        player.velocityY = 0;
     },
     
     // Get current level metadata
@@ -332,7 +357,26 @@ const LevelManager = {
     }
 };
 
-
+// Handle level completion sequence timing and progression
+function updateCompletionSequence(currentTime) {
+    const elapsed = currentTime - completionStartTime;
+    const COMPLETION_DISPLAY_TIME = 2000; // Show message for 2 seconds
+    
+    if (elapsed >= COMPLETION_DISPLAY_TIME) {
+        // End completion sequence and progress to next level
+        levelCompleting = false;
+        
+        if (currentLevelIndex >= LEVELS.length - 1) {
+            // Last level completed - return to menu or restart
+            console.log('All levels completed!');
+            // TODO: Return to main menu or show final score screen
+            LevelManager.load(0); // For now, restart from first level
+        } else {
+            // Progress to next level
+            LevelManager.load(currentLevelIndex + 1);
+        }
+    }
+}
 
 // DETERMINISTIC TIME-BASED MOVERS: Update moving platforms from elapsed level time
 function updateMovers() {
@@ -943,11 +987,19 @@ function gameLoop() {
     const dt = Math.min((currentTime - lastFrameTime) / 1000, 1/30); // Cap at 30fps minimum
     lastFrameTime = currentTime;
     
+    // Handle level completion sequence
+    if (levelCompleting) {
+        updateCompletionSequence(currentTime);
+        render(); // Still render but don't update game logic
+        animationId = requestAnimationFrame(gameLoop);
+        return;
+    }
+    
     // TICK/UPDATE WIRING: Advance deterministic level time
     const dtMs = Math.min(dt * 1000, 1000/30); // Cap at 30fps minimum
     levelTimeMs += dtMs;
     
-    // Accumulate run timer for current level
+    // Accumulate run timer for current level (only when not completing)
     levelRunMs += dtMs;
     
     // 1) UPDATE MOVERS FIRST: Deterministic time-based positioning
@@ -982,6 +1034,11 @@ function gameLoop() {
 // 5) Ground stick epsilon
 // 6) Collision-aware carry
 function updatePlayer() {
+    // Skip input processing during level completion
+    if (levelCompleting) {
+        return;
+    }
+    
     // Get current level once for this function
     const level = LevelManager.getCurrent();
     
@@ -1151,6 +1208,11 @@ function render() {
     
     // Draw UI elements in screen coordinates (no camera transform)
     renderTimerHUD();
+    
+    // Render completion message if active
+    if (levelCompleting) {
+        renderCompletionMessage();
+    }
     
     if (DEBUG) {
         renderDebugOverlay();
@@ -1339,40 +1401,76 @@ function renderDoors() {
     
     for (const door of activeDoors) {
         // Set exit door colors based on world
-        let fillColor, strokeColor;
+        let fillColor, strokeColor, glowColor;
         switch (door.world) {
             case 'light':
                 fillColor = '#32CD32';   // Bright green for light world exit
                 strokeColor = '#228B22'; // Darker green border
+                glowColor = '#90EE90';   // Light green glow
                 break;
             case 'dark':
                 fillColor = '#9370DB';   // Purple for dark world exit
                 strokeColor = '#663399'; // Darker purple border
+                glowColor = '#DDA0DD';   // Light purple glow
                 break;
             case 'both':
-                fillColor = '#808080';   // Neutral grey for both-world exit
-                strokeColor = '#555555'; // Darker grey border
+                fillColor = '#FFD700';   // Gold for both-world exit
+                strokeColor = '#FFA500'; // Orange border
+                glowColor = '#FFFF99';   // Light yellow glow
                 break;
             default:
                 fillColor = '#228B22';   // Fallback green
                 strokeColor = '#006600';
+                glowColor = '#90EE90';
         }
         
+        // Draw glow effect (larger, semi-transparent)
+        ctx.fillStyle = glowColor + '40'; // Add alpha for transparency
+        ctx.fillRect(door.x - 3, door.y - 3, door.width + 6, door.height + 6);
+        
+        // Draw main door body
         ctx.fillStyle = fillColor;
         ctx.fillRect(door.x, door.y, door.width, door.height);
         
-        // Draw door border
+        // Draw door frame (inner border)
         ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(door.x, door.y, door.width, door.height);
+        ctx.lineWidth = 3;
+        ctx.strokeRect(door.x + 2, door.y + 2, door.width - 4, door.height - 4);
         
-        // Draw exit indicator (arrow or symbol)
+        // Draw door panels (decorative)
+        const panelMargin = 4;
+        const panelWidth = (door.width - panelMargin * 3) / 2;
+        const panelHeight = door.height - panelMargin * 2;
+        
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1;
+        // Left panel
+        ctx.strokeRect(door.x + panelMargin, door.y + panelMargin, panelWidth, panelHeight);
+        // Right panel
+        ctx.strokeRect(door.x + panelMargin * 2 + panelWidth, door.y + panelMargin, panelWidth, panelHeight);
+        
+        // Draw EXIT text with background
         const centerX = door.x + door.width / 2;
         const centerY = door.y + door.height / 2;
-        ctx.fillStyle = '#FFFFFF'; // White symbol
-        ctx.font = '16px Arial';
+        
+        // Text background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillRect(centerX - 20, centerY - 8, 40, 16);
+        
+        // EXIT text
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 12px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('EXIT', centerX, centerY + 5);
+        ctx.fillText('EXIT', centerX, centerY + 4);
+        
+        // Draw arrow pointing up
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY - 15);
+        ctx.lineTo(centerX - 5, centerY - 10);
+        ctx.lineTo(centerX + 5, centerY - 10);
+        ctx.closePath();
+        ctx.fill();
     }
 }
 
@@ -1388,6 +1486,30 @@ function renderTimerHUD() {
     ctx.font = '16px Arial';
     const bestTimeText = levelBestMs !== null ? `Best: ${formatTime(levelBestMs)}` : 'Best: — — : — — : — — —';
     ctx.fillText(bestTimeText, 20, 65);
+}
+
+// Render level completion message
+function renderCompletionMessage() {
+    // Semi-transparent overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    
+    // Completion message text
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 48px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(completionMessage, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
+    
+    // Time display
+    ctx.font = 'bold 24px Arial';
+    ctx.fillText(`Time: ${formatTime(levelRunMs)}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 20);
+    
+    // Best time if improved
+    if (levelBestMs !== null && levelRunMs <= levelBestMs) {
+        ctx.font = '20px Arial';
+        ctx.fillStyle = '#FFD700'; // Gold color for new best
+        ctx.fillText('NEW BEST TIME!', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 50);
+    }
 }
 
 // Developer debug overlay (temporary for testing)
