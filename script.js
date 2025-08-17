@@ -81,7 +81,7 @@ const CAMERA_DEADZONE_WIDTH = 160; // Horizontal deadzone width in pixels
 const CAMERA_SMOOTHING = 0.15; // Camera smoothing factor
 
 // Debug flag
-const DEBUG = true;
+const DEBUG = false;
 
 // Player object
 const player = {
@@ -130,7 +130,7 @@ function applyCanvasScale() {
     canvas.style.width = scaledWidth + 'px';
     canvas.style.height = scaledHeight + 'px';
     
-    console.log(`Canvas scaled to ${scale}x (${scaledWidth}×${scaledHeight})`);
+
 }
 
 // LEVELMANAGER: Manages level loading, resetting, and completion
@@ -138,12 +138,12 @@ const LevelManager = {
     // Load a level by index
     load(index) {
         if (index < 0 || index >= LEVELS.length) {
-            console.error('Invalid level index:', index);
+
             return;
         }
         
         const level = LEVELS[index];
-        console.log(`Loading level ${index}: ${level.meta.name}`);
+
         
         // Clear all runtime arrays
         platforms = [];
@@ -221,14 +221,14 @@ const LevelManager = {
                     // Validate that it's a stationary platform (not a mover)
                     const attachedMover = movers.find(m => m.id === spike.attachedTo);
                     if (attachedMover) {
-                        console.warn(`Spike ${spike.id} cannot attach to moving platform ${spike.attachedTo} - skipping`);
+
                         return; // Skip this spike
                     }
                     
                     // Inherit world from attached platform
                     inheritedWorld = attachedPlatform.world;
                 } else {
-                    console.warn(`Spike ${spike.id} references unknown platform ${spike.attachedTo} - using spike's own world`);
+
                 }
             }
             
@@ -258,14 +258,14 @@ const LevelManager = {
         // Initialize camera
         this.updateCamera();
         
-        console.log(`Level loaded: ${platforms.length} platforms, ${movers.length} movers, ${spikes.length} spikes, ${doors.length} doors`);
+
     },
     
     // Reset current level (death/manual reset)
     reset() {
         if (currentLevelIndex < 0 || currentLevelIndex >= LEVELS.length) return;
         
-        console.log('Resetting level');
+
         
         const level = LEVELS[currentLevelIndex];
         
@@ -310,17 +310,17 @@ const LevelManager = {
     
     // Complete current level
     complete() {
-        console.log('Level completed!');
+
         
         // Stop the run timer and check for new best time
         const finalTime = levelRunMs;
-        console.log(`Level completed in: ${formatTime(finalTime)}`);
+
         
         // Save best time if this run was better (or no best exists)
         if (levelBestMs === null || finalTime < levelBestMs) {
             levelBestMs = finalTime;
             saveBestTime(currentLevelIndex, finalTime);
-            console.log(`New best time: ${formatTime(finalTime)}`);
+
         }
         
         // Start completion sequence
@@ -412,7 +412,7 @@ function updateCompletionSequence(currentTime) {
         
         if (currentLevelIndex >= LEVELS.length - 1) {
             // Last level completed - return to menu or restart
-            console.log('All levels completed!');
+
             // TODO: Return to main menu or show final score screen
             LevelManager.load(0); // For now, restart from first level
         } else {
@@ -464,21 +464,40 @@ function formatTime(milliseconds) {
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${ms.toString().padStart(3, '0')}`;
 }
 
-// localStorage functions for best times
+// localStorage functions for best times (namespaced by host)
+function getBestTimeKey(levelIndex) {
+    return `${window.location.host}:bestTime:${levelIndex}`;
+}
+
 function saveBestTime(levelIndex, timeMs) {
     try {
-        localStorage.setItem(`bestTime_${levelIndex}`, timeMs.toString());
+        const key = getBestTimeKey(levelIndex);
+        localStorage.setItem(key, timeMs.toString());
     } catch (e) {
-        console.warn('Could not save best time to localStorage:', e);
+        // Silently fail if localStorage is not available
     }
 }
 
 function loadBestTime(levelIndex) {
     try {
-        const saved = localStorage.getItem(`bestTime_${levelIndex}`);
+        const key = getBestTimeKey(levelIndex);
+        let saved = localStorage.getItem(key);
+        
+        // Migrate old format if exists
+        if (!saved) {
+            const oldKey = `bestTime_${levelIndex}`;
+            const oldValue = localStorage.getItem(oldKey);
+            if (oldValue) {
+                // Migrate to new format
+                localStorage.setItem(key, oldValue);
+                localStorage.removeItem(oldKey);
+                saved = oldValue;
+            }
+        }
+        
         return saved ? parseInt(saved, 10) : null;
     } catch (e) {
-        console.warn('Could not load best time from localStorage:', e);
+        // Silently fail if localStorage is not available
         return null;
     }
 }
@@ -766,7 +785,7 @@ function swapWorld() {
     if (!canSwapToWorld(targetWorld)) {
         // Swap would cause overlap - show failed message and abort
         showSwapFailedMessage();
-        console.log('Swap failed - would overlap with solid object');
+
         return false; // Swap failed
     }
     
@@ -781,7 +800,7 @@ function swapWorld() {
     // Record swap time for cooldown (only on successful swap)
     lastSwapTime = Date.now();
     
-    console.log('Swapped to:', currentWorld);
+
     return true; // Swap succeeded
 }
 
@@ -916,29 +935,37 @@ function showSwapFailedMessage() {
 // Clear all localStorage records for fresh start
 function clearAllRecords() {
     const keysToRemove = [];
+    const host = window.location.host;
+    
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key.startsWith('bestTime_')) {
-            keysToRemove.push(key);
+        if (key) {
+            // Remove old format keys
+            if (key.startsWith('bestTime_')) {
+                keysToRemove.push(key);
+            }
+            // Remove new format keys for current host
+            if (key.startsWith(`${host}:bestTime:`)) {
+                keysToRemove.push(key);
+            }
         }
     }
+    
     keysToRemove.forEach(key => localStorage.removeItem(key));
-    console.log('Cleared', keysToRemove.length, 'old time records for fresh start with new levels');
 }
 
 // Initialize the game
 function init() {
-    console.log('Vibe Coding Game initialized!');
+
     
-    // Clear all old records for fresh start with new levels
-    clearAllRecords();
+    // Migrate old localStorage keys if needed (automatic on first load of each level)
     
     // Check if LEVELS is available
     if (typeof LEVELS === 'undefined') {
-        console.error('LEVELS not found - make sure levels.js is loaded first');
+
         return;
     }
-    console.log('LEVELS loaded successfully:', LEVELS.length, 'levels found');
+
     
     // Add event listeners
     startBtn.addEventListener('click', startGame);
@@ -956,6 +983,23 @@ function init() {
 function setupKeyboardControls() {
     document.addEventListener('keydown', (e) => {
         const key = e.key.toLowerCase();
+        
+        // Handle number keys for level selection (1-3)
+        if (gameStarted && !countdownActive && !levelCompleting) {
+            if (e.key === '1') {
+                LevelManager.load(0);
+                e.preventDefault();
+                return;
+            } else if (e.key === '2') {
+                LevelManager.load(1);
+                e.preventDefault();
+                return;
+            } else if (e.key === '3') {
+                LevelManager.load(2);
+                e.preventDefault();
+                return;
+            }
+        }
         
         // Handle Space key for world swapping (edge detection)
         if (e.code === 'Space') {
@@ -994,16 +1038,16 @@ function setupKeyboardControls() {
 
 // Start the game
 function startGame() {
-    console.log('Start button clicked!');
+
     
     if (gameStarted) {
-        console.log('Game already started, ignoring click');
+
         return;
     }
     
     try {
     gameStarted = true;
-    console.log('Game started!');
+
     
         // Update UI - enter game mode
     startBtn.textContent = 'Game Running...';
@@ -1017,20 +1061,20 @@ function startGame() {
         applyCanvasScale();
         
         // Load first level
-        console.log('Loading first level...');
+
         LevelManager.load(0);
         
         // Initialize frame timing
         lastFrameTime = performance.now();
         
         // Start game loop
-        console.log('Starting game loop...');
+
         gameLoop();
         
-        console.log('Game initialization complete!');
+
         
     } catch (error) {
-        console.error('Error starting game:', error);
+
         gameStarted = false; // Reset on error
         startBtn.disabled = false;
         startBtn.style.display = 'block';
@@ -1190,7 +1234,7 @@ function updatePlayer() {
     // DEATH PIT MECHANIC: Player dies if they fall below the level boundary
     // Check if player's bottom edge is below level height (entire bounding box offscreen)
     if (level && player.y + player.height > level.meta.height) {
-        console.log('Player fell into death pit - resetting');
+
         LevelManager.reset();
         return;
     }
@@ -1212,7 +1256,7 @@ function checkSpikeCollisions() {
     
     for (const spike of activeSpikes) {
         if (rectanglesOverlap(playerRect, spike)) {
-            console.log('Player hit spikes - resetting');
+
             LevelManager.reset();
             return;
         }
@@ -1236,7 +1280,7 @@ function checkDoorInteractions() {
     for (const door of activeDoors) {
         // Exit door overlap check - immediate completion on touch
         if (rectanglesOverlap(playerRect, door) && door.type === 'exit') {
-            console.log('Player reached exit door - level complete');
+
             LevelManager.complete();
             return;
         }
@@ -1303,22 +1347,7 @@ function render() {
         renderCompletionMessage();
     }
     
-    if (DEBUG) {
-        renderDebugOverlay();
-    }
-    
-    // Draw controls info
-    const textColor = currentWorld === 'light' ? '#2D3436' : '#FFFFFF';
-    ctx.fillStyle = textColor;
-    ctx.font = '16px Arial';
-    if (DEBUG) {
-        ctx.fillText('Controls: A/D (move), W (jump), SPACE (swap), R (reset), 1/2/3 (levels)', 10, 30);
-    } else {
-        ctx.fillText('Controls: A (left), D (right), W (jump), SPACE (swap world)', 10, 30);
-    }
-    
-    // Render swap failed message if visible
-    renderSwapFailedMessage();
+
 }
 
 // Check if object AABB intersects viewport (for culling)
@@ -1922,7 +1951,7 @@ function renderTutorialText() {
     ctx.restore();
 }
 
-// Render timer HUD (live timer and best time)
+// Render timer HUD (live timer, best time, and level number)
 function renderTimerHUD() {
     // Don't show timer during countdown
     if (countdownActive) return;
@@ -1930,16 +1959,20 @@ function renderTimerHUD() {
     // Choose text color based on current world for readability
     const textColor = currentWorld === 'light' ? '#2D3436' : '#FFFFFF';
     
-    // Live run timer (top-left, large)
+    // Level number (top-left, above timer)
     ctx.fillStyle = textColor;
-    ctx.font = 'bold 24px Arial';
+    ctx.font = 'bold 20px Arial';
     ctx.textAlign = 'left';
-    ctx.fillText(formatTime(levelRunMs), 20, 40);
+    ctx.fillText(`Level ${currentLevelIndex + 1}`, 20, 25);
+    
+    // Live run timer (below level number, large)
+    ctx.font = 'bold 24px Arial';
+    ctx.fillText(formatTime(levelRunMs), 20, 55);
     
     // Best time (below live timer, smaller)
     ctx.font = '16px Arial';
     const bestTimeText = levelBestMs !== null ? `Best: ${formatTime(levelBestMs)}` : 'Best: — — : — — : — — —';
-    ctx.fillText(bestTimeText, 20, 65);
+    ctx.fillText(bestTimeText, 20, 80);
 }
 
 // Render countdown overlay

@@ -98,7 +98,8 @@ const LEVELS = [
             { x: 750, y: 180, text: "W = Jump", size: 24, minX: 650, maxX: 850 },
             { x: 1000, y: 180, text: "Space = Swap Worlds", size: 24, minX: 900, maxX: 1100 },
             { x: 1150, y: 200, text: "Light = Faster", size: 20, minX: 1100, maxX: 1200 },
-            { x: 1150, y: 230, text: "Dark = Float", size: 20, minX: 1100, maxX: 1200 }
+            { x: 1150, y: 230, text: "Dark = Float", size: 20, minX: 1100, maxX: 1200 },
+            { x: 1150, y: 260, text: "Use keys 1-3 to change levels", size: 18, minX: 1100, maxX: 1200 }
         ],
 
         doors: [
