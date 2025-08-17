@@ -32,6 +32,11 @@ let levelCompleting = false; // True when level completion sequence is active
 let completionStartTime = 0; // When the completion sequence started
 let completionMessage = ''; // Message to display during completion
 
+// Countdown state
+let countdownActive = false; // True when countdown is active
+let countdownValue = 3; // Current countdown value (3, 2, 1)
+let countdownStartTime = 0; // When the countdown started
+
 // Camera system
 let camera = { x: 0, y: 0 };
 
@@ -160,6 +165,11 @@ const LevelManager = {
         completionStartTime = 0;
         completionMessage = '';
         
+        // Start countdown
+        countdownActive = true;
+        countdownValue = 3;
+        countdownStartTime = performance.now();
+        
         // Set spawn state
         currentWorld = level.spawn.world;
         player.x = level.spawn.x;
@@ -271,6 +281,11 @@ const LevelManager = {
         completionStartTime = 0;
         completionMessage = '';
         
+        // Start countdown
+        countdownActive = true;
+        countdownValue = 3;
+        countdownStartTime = performance.now();
+        
         // Reset player to spawn
         currentWorld = level.spawn.world;
         player.x = level.spawn.x;
@@ -335,6 +350,14 @@ const LevelManager = {
         const level = this.getCurrent();
         if (!level) return;
         
+        // During countdown, keep camera at spawn position
+        if (countdownActive) {
+            const targetX = Math.max(0, Math.min(level.spawn.x - CANVAS_WIDTH / 2, level.meta.width - CANVAS_WIDTH));
+            camera.x = targetX;
+            camera.y = 0;
+            return;
+        }
+        
         // Calculate deadzone boundaries
         const deadzoneLeft = camera.x + (CANVAS_WIDTH - CAMERA_DEADZONE_WIDTH) / 2;
         const deadzoneRight = deadzoneLeft + CAMERA_DEADZONE_WIDTH;
@@ -356,6 +379,27 @@ const LevelManager = {
         camera.y = 0; // No vertical camera movement
     }
 };
+
+// Handle countdown sequence
+function updateCountdown(currentTime) {
+    const elapsed = currentTime - countdownStartTime;
+    
+    // Each number shows for 1 second (1000ms)
+    if (elapsed >= 3000) {
+        // Countdown finished
+        countdownActive = false;
+        // Reset timers to start fresh
+        levelTimeMs = 0;
+        levelRunMs = 0;
+        levelStartMonotonic = performance.now();
+    } else if (elapsed >= 2000) {
+        countdownValue = 1;
+    } else if (elapsed >= 1000) {
+        countdownValue = 2;
+    } else {
+        countdownValue = 3;
+    }
+}
 
 // Handle level completion sequence timing and progression
 function updateCompletionSequence(currentTime) {
@@ -869,9 +913,25 @@ function showSwapFailedMessage() {
     swapFailedMessage.hideTime = Date.now() + 1000; // Hide after 1000ms
 }
 
+// Clear all localStorage records for fresh start
+function clearAllRecords() {
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('bestTime_')) {
+            keysToRemove.push(key);
+        }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    console.log('Cleared', keysToRemove.length, 'old time records for fresh start with new levels');
+}
+
 // Initialize the game
 function init() {
     console.log('Vibe Coding Game initialized!');
+    
+    // Clear all old records for fresh start with new levels
+    clearAllRecords();
     
     // Check if LEVELS is available
     if (typeof LEVELS === 'undefined') {
@@ -987,6 +1047,14 @@ function gameLoop() {
     const dt = Math.min((currentTime - lastFrameTime) / 1000, 1/30); // Cap at 30fps minimum
     lastFrameTime = currentTime;
     
+    // Handle countdown sequence
+    if (countdownActive) {
+        updateCountdown(currentTime);
+        render(); // Still render but don't update game logic
+        animationId = requestAnimationFrame(gameLoop);
+        return;
+    }
+    
     // Handle level completion sequence
     if (levelCompleting) {
         updateCompletionSequence(currentTime);
@@ -999,7 +1067,7 @@ function gameLoop() {
     const dtMs = Math.min(dt * 1000, 1000/30); // Cap at 30fps minimum
     levelTimeMs += dtMs;
     
-    // Accumulate run timer for current level (only when not completing)
+    // Accumulate run timer for current level (only when not completing or counting down)
     levelRunMs += dtMs;
     
     // 1) UPDATE MOVERS FIRST: Deterministic time-based positioning
@@ -1034,8 +1102,8 @@ function gameLoop() {
 // 5) Ground stick epsilon
 // 6) Collision-aware carry
 function updatePlayer() {
-    // Skip input processing during level completion
-    if (levelCompleting) {
+    // Skip input processing during level completion or countdown
+    if (levelCompleting || countdownActive) {
         return;
     }
     
@@ -1194,6 +1262,11 @@ function render() {
     // Apply camera transform
     ctx.translate(-camera.x, -camera.y);
     
+    // Render tutorial text if in Level 1
+    if (currentLevelIndex === 0 && gameStarted) {
+        renderTutorialText();
+    }
+    
     // Draw level objects (with culling)
     renderPlatforms();
     renderMovers(); 
@@ -1219,6 +1292,11 @@ function render() {
     
     // Draw UI elements in screen coordinates (no camera transform)
     renderTimerHUD();
+    
+    // Render countdown if active
+    if (countdownActive) {
+        renderCountdown();
+    }
     
     // Render completion message if active
     if (levelCompleting) {
@@ -1629,30 +1707,7 @@ function renderMovers() {
         }
         ctx.restore();
         
-        // Draw movement path (debug visualization)
-        if (DEBUG) {
-            ctx.strokeStyle = '#FF0000';
-            ctx.lineWidth = 1;
-            ctx.setLineDash([2, 2]);
-            
-            if (mover.axis === 'horizontal') {
-                // Draw horizontal path line
-                const y = mover.from.y + mover.h / 2;
-                ctx.beginPath();
-                ctx.moveTo(mover.from.x, y);
-                ctx.lineTo(mover.to.x + mover.w, y);
-                ctx.stroke();
-            } else if (mover.axis === 'vertical') {
-                // Draw vertical path line
-                const x = mover.from.x + mover.w / 2;
-                ctx.beginPath();
-                ctx.moveTo(x, mover.from.y);
-                ctx.lineTo(x, mover.to.y + mover.h);
-                ctx.stroke();
-            }
-            
-            ctx.setLineDash([]); // Reset line dash
-        }
+        // Movement path debug visualization removed for cleaner visuals
     }
 }
 
@@ -1794,8 +1849,84 @@ function renderDoors() {
     }
 }
 
+// Render tutorial text for Level 1
+function renderTutorialText() {
+    const level = LevelManager.getCurrent();
+    if (!level || !level.tutorialTexts) return;
+    
+    // Set up text styling
+    ctx.save();
+    ctx.font = 'bold 24px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Render each tutorial text
+    for (const tutText of level.tutorialTexts) {
+        // Only show text when player is within the specified range
+        if (tutText.minX !== undefined && tutText.maxX !== undefined) {
+            if (player.x < tutText.minX || player.x > tutText.maxX) {
+                continue;
+            }
+        }
+        
+        // Only render if in camera view
+        if (tutText.x < camera.x - 100 || tutText.x > camera.x + CANVAS_WIDTH + 100) {
+            continue;
+        }
+        
+        // Fade in/out based on player distance
+        let opacity = 1.0;
+        if (tutText.minX !== undefined && tutText.maxX !== undefined) {
+            const fadeDistance = 50;
+            if (player.x < tutText.minX + fadeDistance) {
+                opacity = (player.x - tutText.minX) / fadeDistance;
+            } else if (player.x > tutText.maxX - fadeDistance) {
+                opacity = (tutText.maxX - player.x) / fadeDistance;
+            }
+            opacity = Math.max(0, Math.min(1, opacity));
+        }
+        
+        // Create semi-transparent background for readability
+        const textWidth = ctx.measureText(tutText.text).width;
+        ctx.globalAlpha = opacity * 0.9;
+        ctx.fillStyle = currentWorld === 'light' 
+            ? 'rgba(255, 255, 255, 1)' 
+            : 'rgba(0, 0, 0, 1)';
+        ctx.fillRect(
+            tutText.x - textWidth/2 - 10, 
+            tutText.y - 15, 
+            textWidth + 20, 
+            30
+        );
+        
+        // Draw border
+        ctx.globalAlpha = opacity * 0.8;
+        ctx.strokeStyle = currentWorld === 'light' 
+            ? 'rgba(46, 204, 113, 1)' 
+            : 'rgba(155, 89, 182, 1)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(
+            tutText.x - textWidth/2 - 10, 
+            tutText.y - 15, 
+            textWidth + 20, 
+            30
+        );
+        
+        // Draw text
+        ctx.globalAlpha = opacity;
+        ctx.fillStyle = currentWorld === 'light' ? '#2D3436' : '#FFFFFF';
+        ctx.font = `bold ${tutText.size || 24}px monospace`;
+        ctx.fillText(tutText.text, tutText.x, tutText.y);
+    }
+    
+    ctx.restore();
+}
+
 // Render timer HUD (live timer and best time)
 function renderTimerHUD() {
+    // Don't show timer during countdown
+    if (countdownActive) return;
+    
     // Choose text color based on current world for readability
     const textColor = currentWorld === 'light' ? '#2D3436' : '#FFFFFF';
     
@@ -1809,6 +1940,35 @@ function renderTimerHUD() {
     ctx.font = '16px Arial';
     const bestTimeText = levelBestMs !== null ? `Best: ${formatTime(levelBestMs)}` : 'Best: — — : — — : — — —';
     ctx.fillText(bestTimeText, 20, 65);
+}
+
+// Render countdown overlay
+function renderCountdown() {
+    // Draw semi-transparent background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    
+    // Draw countdown number
+    ctx.save();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 120px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetX = 4;
+    ctx.shadowOffsetY = 4;
+    
+    // Draw the number
+    ctx.fillText(countdownValue.toString(), CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+    
+    // Add a subtitle on first countdown
+    if (countdownValue === 3) {
+        ctx.font = 'bold 24px monospace';
+        ctx.fillText('GET READY!', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 80);
+    }
+    
+    ctx.restore();
 }
 
 // Render level completion message
@@ -1912,6 +2072,51 @@ function renderSwapFailedMessage() {
         // Reset text alignment
         ctx.textAlign = 'left';
     }
+}
+
+// Render tutorial text for Level 1
+function renderTutorialText() {
+    // Only render tutorial in Level 1
+    if (currentLevelIndex !== 0) return;
+    
+    const tutorialTexts = [
+        { text: "A = Left", x: 200, y: 200 },
+        { text: "D = Right", x: 500, y: 200 },
+        { text: "W = Jump", x: 800, y: 200 },
+        { text: "Space = Swap Worlds", x: 1200, y: 200 }
+    ];
+    
+    ctx.save();
+    
+    // Translate for camera but keep text in world space
+    ctx.translate(-camera.x, 0);
+    
+    // Set font style for tutorial text
+    ctx.font = 'bold 28px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Render each tutorial text
+    for (const tutorial of tutorialTexts) {
+        // Only render if within camera view
+        if (tutorial.x >= camera.x - 200 && tutorial.x <= camera.x + CANVAS_WIDTH + 200) {
+            // Background for readability
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            const textWidth = ctx.measureText(tutorial.text).width;
+            ctx.fillRect(tutorial.x - textWidth/2 - 20, tutorial.y - 25, textWidth + 40, 50);
+            
+            // Border for polish
+            ctx.strokeStyle = currentWorld === 'light' ? '#2ECC71' : '#9B59B6';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(tutorial.x - textWidth/2 - 20, tutorial.y - 25, textWidth + 40, 50);
+            
+            // Text with world-appropriate color
+            ctx.fillStyle = currentWorld === 'light' ? '#FFFFFF' : '#FFE74C';
+            ctx.fillText(tutorial.text, tutorial.x, tutorial.y);
+        }
+    }
+    
+    ctx.restore();
 }
 
 // Initialize when DOM is loaded
