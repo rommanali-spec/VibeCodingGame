@@ -11,10 +11,24 @@ let gameStarted = false;
 let animationId = null;
 let currentScale = 1;
 let currentWorld = 'light'; // Current active world: 'light' or 'dark'
-let platforms = []; // Array of platform objects
-let movers = []; // Array of moving platform objects
 
-// Frame timing for smooth mover motion
+// Level system arrays (populated from level data)
+let platforms = [];
+let movers = [];
+let spikes = [];
+let doors = [];
+let levers = [];
+let stars = [];
+
+// Level management
+let currentLevelIndex = 0;
+let levelTimeMs = 0;
+let levelStartMonotonic = 0;
+
+// Camera system
+let camera = { x: 0, y: 0 };
+
+// Frame timing
 let lastFrameTime = 0;
 
 // World swapping state
@@ -46,6 +60,13 @@ const SWAP_COOLDOWN_MS = 500;
 const COLLISION_EPS = 0.001; // Numerical stability epsilon
 const GROUND_STICK_EPS = 2; // Ground stick epsilon in pixels
 
+// Camera constants
+const CAMERA_DEADZONE_WIDTH = 160; // Horizontal deadzone width in pixels
+const CAMERA_SMOOTHING = 0.15; // Camera smoothing factor
+
+// Debug flag
+const DEBUG = true;
+
 // Player object
 const player = {
     x: 100,
@@ -62,7 +83,11 @@ const player = {
 const keys = {
     a: false,
     d: false,
-    w: false
+    w: false,
+    r: false, // Reset level (debug)
+    1: false, // Load level 1 (debug)
+    2: false, // Load level 2 (debug)
+    3: false  // Load level 3 (debug) - Wide Canyon Test
 };
 
 // Calculate the best integer scale factor for the current window size
@@ -92,113 +117,231 @@ function applyCanvasScale() {
     console.log(`Canvas scaled to ${scale}x (${scaledWidth}×${scaledHeight})`);
 }
 
-// Load test platforms for development
-function loadTestPlatforms() {
-    platforms = [
-        // Wide ground platform (both worlds)
-        { id: 'ground', x: 0, y: 320, width: 640, height: 40, world: 'both' },
-        // Light world platform (mid-height)
-        { id: 'light-platform', x: 120, y: 260, width: 140, height: 12, world: 'light' },
-        // Dark world platform (mid-height)
-        { id: 'dark-platform', x: 360, y: 220, width: 140, height: 12, world: 'dark' },
-        // Additional test platforms
-        { id: 'light-upper', x: 50, y: 180, width: 100, height: 12, world: 'light' },
-        { id: 'dark-upper', x: 490, y: 160, width: 100, height: 12, world: 'dark' }
-    ];
-    console.log('Test platforms loaded:', platforms.length);
-}
-
-// Add test moving platforms for development
-function addTestMovers() {
-    movers = [
-        // Horizontal mover (both worlds) - travels under mid-height area
-        {
-            id: 'horizontal-both',
-            x: 200, y: 280, w: 80, h: 12,
-            world: 'both',
-            axis: 'horizontal',
-            speed: 60, // pixels per second
-            from: { x: 200, y: 280 },
-            to: { x: 360, y: 280 },
-            _prevX: 200, _prevY: 280,
-            _dir: 1
-        },
-        
-        // Vertical mover (light world) - tests vertical carry and head-bumps
-        {
-            id: 'vertical-light',
-            x: 480, y: 200, w: 60, h: 12,
-            world: 'light',
-            axis: 'vertical',
-            speed: 40, // pixels per second
-            from: { x: 480, y: 200 },
-            to: { x: 480, y: 280 },
-            _prevX: 480, _prevY: 200,
-            _dir: 1
-        },
-        
-        // Vertical mover (dark world) - alternate for dark world testing
-        {
-            id: 'vertical-dark',
-            x: 100, y: 140, w: 60, h: 12,
-            world: 'dark',
-            axis: 'vertical',
-            speed: 50, // pixels per second
-            from: { x: 100, y: 140 },
-            to: { x: 100, y: 200 },
-            _prevX: 100, _prevY: 140,
-            _dir: 1
+// LEVELMANAGER: Manages level loading, resetting, and completion
+const LevelManager = {
+    // Load a level by index
+    load(index) {
+        if (index < 0 || index >= LEVELS.length) {
+            console.error('Invalid level index:', index);
+            return;
         }
-    ];
-    console.log('Test movers loaded:', movers.length);
-}
+        
+        const level = LEVELS[index];
+        console.log(`Loading level ${index}: ${level.meta.name}`);
+        
+        // Clear all runtime arrays
+        platforms = [];
+        movers = [];
+        spikes = [];
+        doors = [];
+        levers = [];
+        stars = [];
+        
+        // Set level state
+        currentLevelIndex = index;
+        levelTimeMs = 0;
+        levelStartMonotonic = performance.now();
+        
+        // Set spawn state
+        currentWorld = level.spawn.world;
+        player.x = level.spawn.x;
+        player.y = level.spawn.y;
+        player.velocityX = 0;
+        player.velocityY = 0;
+        player.onGround = false;
+        
+        // Build runtime arrays from level data (convert w,h to width,height for consistency)
+        level.platforms.forEach(plat => {
+            platforms.push({
+                id: plat.id || `platform_${platforms.length}`,
+                x: plat.x,
+                y: plat.y,
+                width: plat.w,
+                height: plat.h,
+                world: plat.world
+            });
+        });
+        
+        level.movers.forEach(mover => {
+            movers.push({
+                id: mover.id || `mover_${movers.length}`,
+                x: mover.x,
+                y: mover.y,
+                w: mover.w,
+                h: mover.h,
+                world: mover.world,
+                axis: mover.axis,
+                speed: mover.speed,
+                from: { ...mover.from },
+                to: { ...mover.to },
+                cycleMs: mover.cycleMs,
+                _prevX: mover.x,
+                _prevY: mover.y
+            });
+        });
+        
+        level.spikes.forEach(spike => {
+            spikes.push({
+                id: spike.id || `spike_${spikes.length}`,
+                x: spike.x,
+                y: spike.y,
+                width: spike.w,
+                height: spike.h,
+                world: spike.world
+            });
+        });
+        
+        level.doors.forEach(door => {
+            doors.push({
+                id: door.id,
+                type: door.type,
+                x: door.x,
+                y: door.y,
+                width: door.w,
+                height: door.h,
+                world: door.world,
+                locked: door.locked || false
+            });
+        });
+        
+        level.levers.forEach(lever => {
+            levers.push({
+                id: lever.id,
+                x: lever.x,
+                y: lever.y,
+                width: lever.w,
+                height: lever.h,
+                world: lever.world,
+                targets: lever.targets || []
+            });
+        });
+        
+        level.stars.forEach(star => {
+            stars.push({
+                id: star.id || `star_${stars.length}`,
+                x: star.x,
+                y: star.y,
+                width: star.w,
+                height: star.h,
+                world: star.world,
+                collected: false
+            });
+        });
+        
+        // Initialize camera
+        this.updateCamera();
+        
+        console.log(`Level loaded: ${platforms.length} platforms, ${movers.length} movers, ${spikes.length} spikes, ${doors.length} doors, ${stars.length} stars`);
+    },
+    
+    // Reset current level (death/manual reset)
+    reset() {
+        if (currentLevelIndex < 0 || currentLevelIndex >= LEVELS.length) return;
+        
+        console.log('Resetting level');
+        
+        const level = LEVELS[currentLevelIndex];
+        
+        // Reset timing
+        levelTimeMs = 0;
+        levelStartMonotonic = performance.now();
+        
+        // Reset player to spawn
+        currentWorld = level.spawn.world;
+        player.x = level.spawn.x;
+        player.y = level.spawn.y;
+        player.velocityX = 0;
+        player.velocityY = 0;
+        player.onGround = false;
+        
+        // Reset all toggled states to defaults
+        doors.forEach(door => {
+            const originalDoor = level.doors.find(d => d.id === door.id);
+            if (originalDoor) {
+                door.locked = originalDoor.locked || false;
+            }
+        });
+        
+        // Reset stars
+        stars.forEach(star => {
+            star.collected = false;
+        });
+        
+        // Reset camera
+        this.updateCamera();
+        
+        // Clear physics debug state
+        physicsDebug.standingOnMover = null;
+        physicsDebug.moverDx = 0;
+        physicsDebug.moverDy = 0;
+        physicsDebug.pushedByMoverThisFrame = false;
+    },
+    
+    // Complete current level
+    complete() {
+        console.log('Level completed!');
+        // TODO: Add timer/record tracking here in next steps
+        // TODO: Add level advancement logic here in next steps
+        
+        // For now, just restart the current level
+        this.reset();
+    },
+    
+    // Get current level metadata
+    getCurrent() {
+        if (currentLevelIndex < 0 || currentLevelIndex >= LEVELS.length) return null;
+        return LEVELS[currentLevelIndex];
+    },
+    
+    // Update camera based on player position (horizontal tracking only)
+    updateCamera() {
+        const level = this.getCurrent();
+        if (!level) return;
+        
+        // Calculate deadzone boundaries
+        const deadzoneLeft = camera.x + (CANVAS_WIDTH - CAMERA_DEADZONE_WIDTH) / 2;
+        const deadzoneRight = deadzoneLeft + CAMERA_DEADZONE_WIDTH;
+        
+        let targetCameraX = camera.x;
+        
+        // Adjust target if player is outside deadzone
+        if (player.x < deadzoneLeft) {
+            targetCameraX = player.x - (CANVAS_WIDTH - CAMERA_DEADZONE_WIDTH) / 2;
+        } else if (player.x > deadzoneRight) {
+            targetCameraX = player.x - (CANVAS_WIDTH + CAMERA_DEADZONE_WIDTH) / 2;
+        }
+        
+        // Apply smoothing
+        camera.x += (targetCameraX - camera.x) * CAMERA_SMOOTHING;
+        
+        // Clamp to level bounds
+        camera.x = Math.max(0, Math.min(camera.x, level.meta.width - CANVAS_WIDTH));
+        camera.y = 0; // No vertical camera movement
+    }
+};
 
 
 
-// Update moving platforms with ping-pong motion
-function updateMovers(dt) {
+// DETERMINISTIC TIME-BASED MOVERS: Update moving platforms from elapsed level time
+function updateMovers() {
     for (const mover of movers) {
         // Store previous position for delta calculation
         mover._prevX = mover.x;
         mover._prevY = mover.y;
         
-        // Calculate movement distance this frame
-        const distanceThisFrame = mover.speed * dt;
+        // Calculate position from elapsed level time (deterministic)
+        const elapsed = levelTimeMs;
+        const T = mover.cycleMs;
+        const t = (elapsed % T) / T; // 0..1 cycle progress
         
+        // Map t through ping-pong curve: 0..1..0
+        const u = t <= 0.5 ? (t * 2) : (1 - (t - 0.5) * 2);
+        
+        // Interpolate between endpoints
         if (mover.axis === 'horizontal') {
-            // Move horizontally
-            const targetX = mover.x + (distanceThisFrame * mover._dir);
-            
-            // Check for endpoint collision and ping-pong
-            if (mover._dir > 0 && targetX >= mover.to.x) {
-                // Hit right endpoint
-                mover.x = mover.to.x;
-                mover._dir = -1;
-            } else if (mover._dir < 0 && targetX <= mover.from.x) {
-                // Hit left endpoint
-                mover.x = mover.from.x;
-                mover._dir = 1;
-            } else {
-                // Normal movement
-                mover.x = targetX;
-            }
+            mover.x = mover.from.x + u * (mover.to.x - mover.from.x);
         } else if (mover.axis === 'vertical') {
-            // Move vertically
-            const targetY = mover.y + (distanceThisFrame * mover._dir);
-            
-            // Check for endpoint collision and ping-pong
-            if (mover._dir > 0 && targetY >= mover.to.y) {
-                // Hit bottom endpoint
-                mover.y = mover.to.y;
-                mover._dir = -1;
-            } else if (mover._dir < 0 && targetY <= mover.from.y) {
-                // Hit top endpoint
-                mover.y = mover.from.y;
-                mover._dir = 1;
-            } else {
-                // Normal movement
-                mover.y = targetY;
-            }
+            mover.y = mover.from.y + u * (mover.to.y - mover.from.y);
         }
     }
 }
@@ -359,8 +502,12 @@ function sweepHorizontal(startX, targetX, activeSolids) {
         height: player.height
     };
     
-    // Clamp to screen bounds
-    let clampedX = Math.max(0, Math.min(targetX, CANVAS_WIDTH - player.width));
+    // Clamp to level bounds (not screen bounds)
+    const currentLevel = LevelManager.getCurrent();
+    let clampedX = targetX;
+    if (currentLevel) {
+        clampedX = Math.max(0, Math.min(targetX, currentLevel.meta.width - player.width));
+    }
     
     // Check collisions
     for (const solid of activeSolids) {
@@ -513,10 +660,28 @@ function getCurrentGravity() {
 }
 
 // SINGLE SOURCE OF TRUTH: Get all solid AABBs for collision and safe-swap checks
-// Returns unified array of platforms + movers with consistent x,y,width,height format
+// Returns unified array of platforms + movers + invisible borders + spikes (for death)
 // This is the ONLY function that should be used for collision detection and safe-swap checks
-function getActiveSolidsForWorld(world) {
+function getActiveSolidsForWorld(world, includeSpikes = false) {
     const solids = [];
+    const level = LevelManager.getCurrent();
+    
+    // Add invisible borders (vertical only) to prevent leaving viewport top/bottom
+    if (level) {
+        // Top ceiling (prevent jumping above screen)
+        solids.push({
+            id: 'invisible-ceiling',
+            x: 0,
+            y: camera.y - 4,
+            width: level.meta.width,
+            height: 4,
+            world: 'both',
+            _isInvisibleBorder: true
+        });
+        
+        // NOTE: No horizontal borders - players can fall off sides into death pits
+        // NOTE: No bottom border - players die by falling below level height (see death pit mechanic)
+    }
     
     // Add static platforms (already in correct x,y,width,height format)
     const activePlatforms = platforms.filter(platform => 
@@ -559,6 +724,25 @@ function getActiveSolidsForWorld(world) {
         });
     }
     
+    // Add spikes if requested (for death collision detection)
+    if (includeSpikes) {
+        const activeSpikes = spikes.filter(spike => 
+            spike.world === 'both' || spike.world === world
+        );
+        
+        for (const spike of activeSpikes) {
+            solids.push({
+                id: spike.id,
+                x: spike.x,
+                y: spike.y,
+                width: spike.width,
+                height: spike.height,
+                world: spike.world,
+                _isSpike: true
+            });
+        }
+    }
+    
     return solids;
 }
 
@@ -594,6 +778,13 @@ function showSwapFailedMessage() {
 // Initialize the game
 function init() {
     console.log('Vibe Coding Game initialized!');
+    
+    // Check if LEVELS is available
+    if (typeof LEVELS === 'undefined') {
+        console.error('LEVELS not found - make sure levels.js is loaded first');
+        return;
+    }
+    console.log('LEVELS loaded successfully:', LEVELS.length, 'levels found');
     
     // Add event listeners
     startBtn.addEventListener('click', startGame);
@@ -649,31 +840,48 @@ function setupKeyboardControls() {
 
 // Start the game
 function startGame() {
-    if (gameStarted) return;
+    console.log('Start button clicked!');
     
-    gameStarted = true;
-    console.log('Game started!');
+    if (gameStarted) {
+        console.log('Game already started, ignoring click');
+        return;
+    }
     
-    // Update UI - enter game mode
-    startBtn.textContent = 'Game Running...';
-    startBtn.disabled = true;
-    startBtn.style.display = 'none';
-    document.body.classList.add('game-mode');
-    app.classList.add('game-mode');
-    canvas.style.display = 'block';
-    
-    // Apply integer scaling
-    applyCanvasScale();
-    
-    // Load test platforms and movers
-    loadTestPlatforms();
-    addTestMovers();
-    
-    // Initialize frame timing
-    lastFrameTime = performance.now();
-    
-    // Start game loop
-    gameLoop();
+    try {
+        gameStarted = true;
+        console.log('Game started!');
+        
+        // Update UI - enter game mode
+        startBtn.textContent = 'Game Running...';
+        startBtn.disabled = true;
+        startBtn.style.display = 'none';
+        document.body.classList.add('game-mode');
+        app.classList.add('game-mode');
+        canvas.style.display = 'block';
+        
+        // Apply integer scaling
+        applyCanvasScale();
+        
+        // Load first level
+        console.log('Loading first level...');
+        LevelManager.load(0);
+        
+        // Initialize frame timing
+        lastFrameTime = performance.now();
+        
+        // Start game loop
+        console.log('Starting game loop...');
+        gameLoop();
+        
+        console.log('Game initialization complete!');
+        
+    } catch (error) {
+        console.error('Error starting game:', error);
+        gameStarted = false; // Reset on error
+        startBtn.disabled = false;
+        startBtn.style.display = 'block';
+        startBtn.textContent = 'Start Game';
+    }
 }
 
 // Main game loop
@@ -685,14 +893,27 @@ function gameLoop() {
     const dt = Math.min((currentTime - lastFrameTime) / 1000, 1/30); // Cap at 30fps minimum
     lastFrameTime = currentTime;
     
-    // 1) UPDATE MOVERS FIRST: Update to new positions and store mover.dx, mover.dy
-    updateMovers(dt);
+    // TICK/UPDATE WIRING: Advance deterministic level time
+    const dtMs = Math.min(dt * 1000, 1000/30); // Cap at 30fps minimum
+    levelTimeMs += dtMs;
+    
+    // 1) UPDATE MOVERS FIRST: Deterministic time-based positioning
+    updateMovers();
     
     // 2) KINEMATIC-PUSH PHASE: Handle movers pushing INTO the player
     applyKinematicPush();
     
     // 3-6) Player physics with strict collision order
     updatePlayer();
+    
+    // Update camera after player movement
+    LevelManager.updateCamera();
+    
+    // Check for spike collisions (death)
+    checkSpikeCollisions();
+    
+    // Check for door interactions
+    checkDoorInteractions();
     
     // Render everything
     render();
@@ -708,6 +929,9 @@ function gameLoop() {
 // 5) Ground stick epsilon
 // 6) Collision-aware carry
 function updatePlayer() {
+    // Get current level once for this function
+    const level = LevelManager.getCurrent();
+    
     // 3) READ INPUT AND INTEGRATE VELOCITIES
     // Handle horizontal movement input
     if (keys.a) {
@@ -724,6 +948,26 @@ function updatePlayer() {
         player.onGround = false;
     }
     
+    // Debug controls
+    if (DEBUG) {
+        if (keys.r) {
+            LevelManager.reset();
+            keys.r = false; // Prevent rapid resets
+        }
+        if (keys[1]) {
+            LevelManager.load(0);
+            keys[1] = false;
+        }
+        if (keys[2] && LEVELS.length > 1) {
+            LevelManager.load(1);
+            keys[2] = false;
+        }
+        if (keys[3] && LEVELS.length > 2) {
+            LevelManager.load(2); // Wide Canyon Test
+            keys[3] = false;
+        }
+    }
+    
     // Apply gravity (world-specific)
     player.velocityY += getCurrentGravity();
     
@@ -738,10 +982,13 @@ function updatePlayer() {
     // 4.1) HORIZONTAL collision pass
     const newX = player.x + player.velocityX;
     
-    // Keep player within horizontal bounds
-    let clampedX = Math.max(0, Math.min(newX, CANVAS_WIDTH - player.width));
-    if (clampedX !== newX) {
-        player.velocityX = 0; // Hit screen boundary
+    // Keep player within level bounds (not screen bounds - camera handles that)
+    let clampedX = newX;
+    if (level) {
+        clampedX = Math.max(0, Math.min(newX, level.meta.width - player.width));
+        if (clampedX !== newX) {
+            player.velocityX = 0; // Hit level boundary
+        }
     }
     
     // Resolve horizontal collisions (includes movers)
@@ -761,27 +1008,80 @@ function updatePlayer() {
     // 6) COLLISION-AWARE CARRY: Apply mover deltas through collision system
     applyCollisionAwareCarry(standingOnMover);
     
-    // Safety check: prevent falling off bottom of screen
-    if (player.y > CANVAS_HEIGHT) {
-        player.y = 100;
-        player.x = 100;
-        player.velocityY = 0;
-        player.onGround = false;
+    // DEATH PIT MECHANIC: Player dies if they fall below the level boundary
+    // Check if player's bottom edge is below level height (entire bounding box offscreen)
+    if (level && player.y + player.height > level.meta.height) {
+        console.log('Player fell into death pit - resetting');
+        LevelManager.reset();
+        return;
+    }
+}
+
+// Check for spike collisions (causes death/reset)
+function checkSpikeCollisions() {
+    const playerRect = {
+        x: player.x,
+        y: player.y,
+        width: player.width,
+        height: player.height
+    };
+    
+    // Get spikes in current world
+    const activeSpikes = spikes.filter(spike => 
+        spike.world === 'both' || spike.world === currentWorld
+    );
+    
+    for (const spike of activeSpikes) {
+        if (rectanglesOverlap(playerRect, spike)) {
+            console.log('Player hit spikes - resetting');
+            LevelManager.reset();
+            return;
+        }
+    }
+}
+
+// Check for door interactions (level completion)
+function checkDoorInteractions() {
+    const playerRect = {
+        x: player.x,
+        y: player.y,
+        width: player.width,
+        height: player.height
+    };
+    
+    // Get doors in current world
+    const activeDoors = doors.filter(door => 
+        door.world === 'both' || door.world === currentWorld
+    );
+    
+    for (const door of activeDoors) {
+        if (rectanglesOverlap(playerRect, door) && door.type === 'exit' && !door.locked) {
+            console.log('Player reached exit door - level complete');
+            LevelManager.complete();
+            return;
+        }
     }
 }
 
 
 
-// Render the game
+// Render the game with camera transforms and culling
 function render() {
     // Clear canvas
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     
-    // Draw platforms
-    renderPlatforms();
+    // Save context for camera transforms
+    ctx.save();
     
-    // Draw moving platforms
-    renderMovers();
+    // Apply camera transform
+    ctx.translate(-camera.x, -camera.y);
+    
+    // Draw level objects (with culling)
+    renderPlatforms();
+    renderMovers(); 
+    renderSpikes();
+    renderDoors();
+    renderStars();
     
     // Draw player
     ctx.fillStyle = player.color;
@@ -792,22 +1092,46 @@ function render() {
     ctx.lineWidth = 2;
     ctx.strokeRect(player.x, player.y, player.width, player.height);
     
-    // Draw controls and world info
+    // Restore context (back to screen coordinates)
+    ctx.restore();
+    
+    // Draw UI elements in screen coordinates (no camera transform)
+    if (DEBUG) {
+        renderDebugOverlay();
+    }
+    
+    // Draw controls info
     ctx.fillStyle = '#2D3436';
     ctx.font = '16px Arial';
-    ctx.fillText('Controls: A (left), D (right), W (jump), SPACE (swap world)', 10, 30);
-    
-    // Developer debug overlay
-    renderDebugOverlay();
+    if (DEBUG) {
+        ctx.fillText('Controls: A/D (move), W (jump), SPACE (swap), R (reset), 1/2/3 (levels)', 10, 30);
+    } else {
+        ctx.fillText('Controls: A (left), D (right), W (jump), SPACE (swap world)', 10, 30);
+    }
     
     // Render swap failed message if visible
     renderSwapFailedMessage();
 }
 
-// Render platforms based on current world
+// Check if object AABB intersects viewport (for culling)
+function isInViewport(obj) {
+    const viewLeft = camera.x;
+    const viewRight = camera.x + CANVAS_WIDTH;
+    const viewTop = camera.y;
+    const viewBottom = camera.y + CANVAS_HEIGHT;
+    
+    return obj.x < viewRight && 
+           obj.x + (obj.width || obj.w) > viewLeft &&
+           obj.y < viewBottom &&
+           obj.y + (obj.height || obj.h) > viewTop;
+}
+
+// Render platforms based on current world (with culling)
 function renderPlatforms() {
-    const activeSolids = getActiveSolidsForWorld(currentWorld);
-    const activePlatforms = activeSolids.filter(solid => solid._isStatic);
+    const activePlatforms = platforms.filter(platform => 
+        (platform.world === 'both' || platform.world === currentWorld) && 
+        isInViewport(platform)
+    );
     
     for (const platform of activePlatforms) {
         // Set color based on world type
@@ -835,14 +1159,14 @@ function renderPlatforms() {
     }
 }
 
-// Render moving platforms based on current world
+// Render moving platforms based on current world (with culling)
 function renderMovers() {
-    const activeSolids = getActiveSolidsForWorld(currentWorld);
-    const activeMovers = activeSolids.filter(solid => solid._isMover);
+    const activeMovers = movers.filter(mover => 
+        (mover.world === 'both' || mover.world === currentWorld) && 
+        isInViewport(mover)
+    );
     
     for (const mover of activeMovers) {
-        const moverRef = mover._moverRef;
-        
         // Set color based on world type (distinct from static platforms)
         // Use semi-transparent fills to show they're solid colliders
         switch (mover.world) {
@@ -860,70 +1184,192 @@ function renderMovers() {
         }
         
         // Draw mover as filled rectangle (not just outline)
-        ctx.fillRect(mover.x, mover.y, mover.width, mover.height);
+        ctx.fillRect(mover.x, mover.y, mover.w, mover.h);
         
         // Draw mover border for clarity
         ctx.strokeStyle = '#222222';
         ctx.lineWidth = 2;
-        ctx.strokeRect(mover.x, mover.y, mover.width, mover.height);
+        ctx.strokeRect(mover.x, mover.y, mover.w, mover.h);
         
         // Draw movement path (debug visualization)
-        ctx.strokeStyle = '#FF0000';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([2, 2]);
+        if (DEBUG) {
+            ctx.strokeStyle = '#FF0000';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([2, 2]);
+            
+            if (mover.axis === 'horizontal') {
+                // Draw horizontal path line
+                const y = mover.from.y + mover.h / 2;
+                ctx.beginPath();
+                ctx.moveTo(mover.from.x, y);
+                ctx.lineTo(mover.to.x + mover.w, y);
+                ctx.stroke();
+            } else if (mover.axis === 'vertical') {
+                // Draw vertical path line
+                const x = mover.from.x + mover.w / 2;
+                ctx.beginPath();
+                ctx.moveTo(x, mover.from.y);
+                ctx.lineTo(x, mover.to.y + mover.h);
+                ctx.stroke();
+            }
+            
+            ctx.setLineDash([]); // Reset line dash
+        }
+    }
+}
+
+// Render spikes based on current world (with culling)
+function renderSpikes() {
+    const activeSpikes = spikes.filter(spike => 
+        (spike.world === 'both' || spike.world === currentWorld) &&
+        isInViewport(spike)
+    );
+    
+    for (const spike of activeSpikes) {
+        // Draw spikes in danger red
+        ctx.fillStyle = '#FF0000';
+        ctx.fillRect(spike.x, spike.y, spike.width, spike.height);
         
-        if (moverRef.axis === 'horizontal') {
-            // Draw horizontal path line
-            const y = moverRef.from.y + moverRef.h / 2;
+        // Draw spikes border
+        ctx.strokeStyle = '#CC0000';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(spike.x, spike.y, spike.width, spike.height);
+        
+        // Draw spike pattern for visual clarity
+        ctx.strokeStyle = '#FFAAAA';
+        ctx.lineWidth = 1;
+        for (let x = spike.x; x < spike.x + spike.width; x += 8) {
             ctx.beginPath();
-            ctx.moveTo(moverRef.from.x, y);
-            ctx.lineTo(moverRef.to.x + moverRef.w, y);
-            ctx.stroke();
-        } else if (moverRef.axis === 'vertical') {
-            // Draw vertical path line
-            const x = moverRef.from.x + moverRef.w / 2;
-            ctx.beginPath();
-            ctx.moveTo(x, moverRef.from.y);
-            ctx.lineTo(x, moverRef.to.y + moverRef.h);
+            ctx.moveTo(x, spike.y + spike.height);
+            ctx.lineTo(x + 4, spike.y);
             ctx.stroke();
         }
+    }
+}
+
+// Render doors based on current world (with culling)
+function renderDoors() {
+    const activeDoors = doors.filter(door => 
+        (door.world === 'both' || door.world === currentWorld) &&
+        isInViewport(door)
+    );
+    
+    for (const door of activeDoors) {
+        // Set color based on lock state
+        if (door.locked) {
+            ctx.fillStyle = '#8B4513'; // Brown for locked
+        } else {
+            ctx.fillStyle = '#228B22'; // Green for unlocked
+        }
         
-        ctx.setLineDash([]); // Reset line dash
+        ctx.fillRect(door.x, door.y, door.width, door.height);
+        
+        // Draw door border
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(door.x, door.y, door.width, door.height);
+        
+        // Draw door handle
+        const handleX = door.x + door.width * 0.8;
+        const handleY = door.y + door.height * 0.5;
+        ctx.fillStyle = '#FFD700'; // Gold handle
+        ctx.beginPath();
+        ctx.arc(handleX, handleY, 3, 0, 2 * Math.PI);
+        ctx.fill();
+    }
+}
+
+// Render stars based on current world (with culling)
+function renderStars() {
+    const activeStars = stars.filter(star => 
+        (star.world === 'both' || star.world === currentWorld) &&
+        isInViewport(star) &&
+        !star.collected
+    );
+    
+    for (const star of activeStars) {
+        // Draw star in gold
+        ctx.fillStyle = '#FFD700';
+        
+        // Draw simple star shape
+        const centerX = star.x + star.width / 2;
+        const centerY = star.y + star.height / 2;
+        const size = Math.min(star.width, star.height) / 2;
+        
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) {
+            const radius = i % 2 === 0 ? size : size * 0.5;
+            const angle = (i * Math.PI) / 5;
+            const x = centerX + Math.cos(angle) * radius;
+            const y = centerY + Math.sin(angle) * radius;
+            
+            if (i === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+        ctx.closePath();
+        ctx.fill();
+        
+        // Star border
+        ctx.strokeStyle = '#B8860B';
+        ctx.lineWidth = 1;
+        ctx.stroke();
     }
 }
 
 // Developer debug overlay (temporary for testing)
 function renderDebugOverlay() {
+    if (!DEBUG) return;
+    
     ctx.fillStyle = '#2D3436';
     ctx.font = '14px Arial';
     
+    const currentLevel = LevelManager.getCurrent();
+    let lineY = 70;
+    
+    // Level info
+    if (currentLevel) {
+        ctx.fillText(`Level: ${currentLevelIndex} - ${currentLevel.meta.name}`, 10, lineY);
+        lineY += 20;
+    }
+    
+    // Camera info
+    ctx.fillText(`Camera X: ${Math.round(camera.x)}`, 10, lineY);
+    lineY += 20;
+    
+    // Player info
+    ctx.fillText(`Player X: ${Math.round(player.x)}, Y: ${Math.round(player.y)}`, 10, lineY);
+    lineY += 20;
+    
+    // Level time
+    ctx.fillText(`Level Time: ${Math.round(levelTimeMs)}ms`, 10, lineY);
+    lineY += 20;
+    
     // Current world
-    ctx.fillText(`World: ${currentWorld}`, 10, 80);
+    ctx.fillText(`World: ${currentWorld}`, 10, lineY);
+    lineY += 20;
     
     // Cooldown status
     const cooldownRemaining = getSwapCooldownRemaining();
     if (cooldownRemaining > 0) {
-        ctx.fillText(`Swap CD: ${cooldownRemaining}ms`, 10, 100);
+        ctx.fillText(`Swap CD: ${cooldownRemaining}ms`, 10, lineY);
     } else {
-        ctx.fillText('Swap CD: ready', 10, 100);
+        ctx.fillText(`Swap CD: ready`, 10, lineY);
     }
-    
-    // Current gravity (for reference)
-    const currentGrav = getCurrentGravity();
-    ctx.fillText(`Gravity: ${currentGrav}`, 10, 120);
-    
-    // Solids count debug aid
-    const activeSolids = getActiveSolidsForWorld(currentWorld);
-    const moversCount = activeSolids.filter(solid => solid._isMover).length;
-    const platformsCount = activeSolids.filter(solid => solid._isStatic).length;
-    ctx.fillText(`Solids: ${activeSolids.length} (${platformsCount} platforms + ${moversCount} movers)`, 10, 140);
+    lineY += 20;
     
     // Physics debug aid: Push/carry state
-    ctx.fillText(`Standing on: ${physicsDebug.standingOnMover || 'null'}`, 10, 160);
+    ctx.fillText(`Standing on: ${physicsDebug.standingOnMover || 'null'}`, 10, lineY);
+    lineY += 20;
+    
     if (physicsDebug.standingOnMover) {
-        ctx.fillText(`Mover dx: ${physicsDebug.moverDx.toFixed(2)}, dy: ${physicsDebug.moverDy.toFixed(2)}`, 10, 180);
+        ctx.fillText(`Mover dx: ${physicsDebug.moverDx.toFixed(2)}, dy: ${physicsDebug.moverDy.toFixed(2)}`, 10, lineY);
+        lineY += 20;
     }
-    ctx.fillText(`Pushed this frame: ${physicsDebug.pushedByMoverThisFrame}`, 10, 200);
+    
+    ctx.fillText(`Pushed this frame: ${physicsDebug.pushedByMoverThisFrame}`, 10, lineY);
 }
 
 // Render "Swap Failed" message when visible

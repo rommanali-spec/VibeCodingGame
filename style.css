@@ -49,11 +49,7 @@ main {
     width: 100%;
 }
 
-#app p {
-    font-size: 1.2rem;
-    margin-bottom: 2rem;
-    color: #555;
-}
+/* Removed #app p styles - no longer needed since welcome message was removed */
 
 #start-btn {
     background: linear-gradient(45deg, #667eea, #764ba2);
