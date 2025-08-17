@@ -181,13 +181,37 @@ const LevelManager = {
         });
         
         level.spikes.forEach(spike => {
+            // Find the platform this spike is attached to
+            let attachedPlatform = null;
+            let inheritedWorld = spike.world; // Default to spike's own world
+            
+            if (spike.attachedTo) {
+                // Find the platform by ID
+                attachedPlatform = platforms.find(p => p.id === spike.attachedTo);
+                
+                if (attachedPlatform) {
+                    // Validate that it's a stationary platform (not a mover)
+                    const attachedMover = movers.find(m => m.id === spike.attachedTo);
+                    if (attachedMover) {
+                        console.warn(`Spike ${spike.id} cannot attach to moving platform ${spike.attachedTo} - skipping`);
+                        return; // Skip this spike
+                    }
+                    
+                    // Inherit world from attached platform
+                    inheritedWorld = attachedPlatform.world;
+                } else {
+                    console.warn(`Spike ${spike.id} references unknown platform ${spike.attachedTo} - using spike's own world`);
+                }
+            }
+            
             spikes.push({
                 id: spike.id || `spike_${spikes.length}`,
                 x: spike.x,
                 y: spike.y,
                 width: spike.w,
                 height: spike.h,
-                world: spike.world
+                world: inheritedWorld,
+                attachedTo: spike.attachedTo || null
             });
         });
         
@@ -848,12 +872,12 @@ function startGame() {
     }
     
     try {
-        gameStarted = true;
-        console.log('Game started!');
-        
+    gameStarted = true;
+    console.log('Game started!');
+    
         // Update UI - enter game mode
-        startBtn.textContent = 'Game Running...';
-        startBtn.disabled = true;
+    startBtn.textContent = 'Game Running...';
+    startBtn.disabled = true;
         startBtn.style.display = 'none';
         document.body.classList.add('game-mode');
         app.classList.add('game-mode');
@@ -1218,7 +1242,7 @@ function renderMovers() {
     }
 }
 
-// Render spikes based on current world (with culling)
+// Render triangular spikes based on current world (with culling)
 function renderSpikes() {
     const activeSpikes = spikes.filter(spike => 
         (spike.world === 'both' || spike.world === currentWorld) &&
@@ -1226,22 +1250,49 @@ function renderSpikes() {
     );
     
     for (const spike of activeSpikes) {
-        // Draw spikes in danger red
-        ctx.fillStyle = '#FF0000';
-        ctx.fillRect(spike.x, spike.y, spike.width, spike.height);
+        // Set spike color based on world
+        let fillColor, strokeColor;
+        switch (spike.world) {
+            case 'light':
+                fillColor = '#2E7D32';   // Darker green for light world spikes
+                strokeColor = '#1B5E20'; // Even darker green border
+                break;
+            case 'dark':
+                fillColor = '#4A3B5A';   // Darker purple for dark world spikes  
+                strokeColor = '#3A2C48'; // Even darker purple border
+                break;
+            case 'both':
+                fillColor = '#424242';   // Neutral grey for both-world spikes
+                strokeColor = '#212121'; // Darker grey border
+                break;
+            default:
+                fillColor = '#FF0000';   // Fallback red
+                strokeColor = '#CC0000';
+        }
         
-        // Draw spikes border
-        ctx.strokeStyle = '#CC0000';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(spike.x, spike.y, spike.width, spike.height);
+        // Draw individual triangular spikes
+        const spikeSize = 16; // Size of each triangular spike
+        const spikeHeight = Math.sqrt(3) / 2 * spikeSize; // Height of equilateral triangle
         
-        // Draw spike pattern for visual clarity
-        ctx.strokeStyle = '#FFAAAA';
+        ctx.fillStyle = fillColor;
+        ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 1;
-        for (let x = spike.x; x < spike.x + spike.width; x += 8) {
+        
+        // Calculate how many spikes fit in the width
+        const numSpikes = Math.floor(spike.width / spikeSize);
+        const startX = spike.x + (spike.width - numSpikes * spikeSize) / 2; // Center the spikes
+        
+        for (let i = 0; i < numSpikes; i++) {
+            const spikeX = startX + i * spikeSize;
+            
+            // Draw equilateral triangle spike pointing up
             ctx.beginPath();
-            ctx.moveTo(x, spike.y + spike.height);
-            ctx.lineTo(x + 4, spike.y);
+            ctx.moveTo(spikeX, spike.y + spike.height);                    // Bottom left
+            ctx.lineTo(spikeX + spikeSize, spike.y + spike.height);        // Bottom right  
+            ctx.lineTo(spikeX + spikeSize / 2, spike.y + spike.height - spikeHeight); // Top point
+            ctx.closePath();
+            
+            ctx.fill();
             ctx.stroke();
         }
     }

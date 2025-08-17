@@ -77,15 +77,22 @@ const LEVELS = [
         ],
 
         spikes: [
-            // Spikes patches on the ground
-            { id: 'spikes1', x: 360, y: 320, w: 40, h: 12, world: 'both' },
-            { id: 'spikes2', x: 750, y: 320, w: 60, h: 12, world: 'light' },
-            { id: 'spikes3', x: 1300, y: 320, w: 50, h: 12, world: 'dark' },
-            { id: 'spikes4', x: 2000, y: 320, w: 80, h: 12, world: 'both' },
+            // Triangular spikes attached to ground (inherits 'both' world from ground)
+            { id: 'ground-spikes1', x: 360, y: 320, w: 80, h: 12, attachedTo: 'ground' },
+            { id: 'ground-spikes2', x: 750, y: 320, w: 96, h: 12, attachedTo: 'ground' },
+            { id: 'ground-spikes3', x: 1300, y: 320, w: 64, h: 12, attachedTo: 'ground' },
+            { id: 'ground-spikes4', x: 2000, y: 320, w: 112, h: 12, attachedTo: 'ground' },
             
-            // Some elevated spike traps
-            { id: 'air-spikes1', x: 520, y: 188, w: 30, h: 12, world: 'light' },
-            { id: 'air-spikes2', x: 720, y: 148, w: 40, h: 12, world: 'dark' },
+            // Spikes on light world platforms (inherits 'light' world)
+            { id: 'light-platform-spikes1', x: 520, y: 188, w: 48, h: 12, attachedTo: 'light-mid1' },
+            { id: 'light-platform-spikes2', x: 1820, y: 188, w: 64, h: 12, attachedTo: 'light-final' },
+            
+            // Spikes on dark world platforms (inherits 'dark' world)  
+            { id: 'dark-platform-spikes1', x: 720, y: 148, w: 64, h: 12, attachedTo: 'dark-mid2' },
+            { id: 'dark-platform-spikes2', x: 420, y: 268, w: 80, h: 12, attachedTo: 'dark-mid1' },
+            
+            // Spikes on both-world platforms (inherits 'both' world)
+            { id: 'both-bridge-spikes', x: 620, y: 288, w: 32, h: 12, attachedTo: 'both-bridge1' },
         ],
 
         doors: [
@@ -152,10 +159,16 @@ const LEVELS = [
         ],
 
         spikes: [
-            // More dangerous spike layout
-            { id: 'pit-spikes1', x: 400, y: 320, w: 200, h: 12, world: 'both' },
-            { id: 'pit-spikes2', x: 1000, y: 320, w: 200, h: 12, world: 'both' },
-            { id: 'ceiling-spikes', x: 600, y: 0, w: 400, h: 12, world: 'both' },
+            // Triangular spikes in the deadly pits (attached to ground segments)
+            { id: 'pit-spikes1', x: 400, y: 320, w: 200, h: 12, attachedTo: 'ground-start' },
+            { id: 'pit-spikes2', x: 1000, y: 320, w: 200, h: 12, attachedTo: 'ground-mid' },
+            
+            // Ceiling spikes attached to invisible ceiling platform
+            { id: 'ceiling-spikes', x: 600, y: 0, w: 400, h: 12, world: 'both' }, // No attachment - ceiling spikes
+            
+            // Platform-attached spikes for extra challenge
+            { id: 'challenge-spikes1', x: 465, y: 268, w: 32, h: 12, attachedTo: 'challenge1' },
+            { id: 'challenge-spikes2', x: 1420, y: 188, w: 64, h: 12, attachedTo: 'challenge4' },
         ],
 
         doors: [
@@ -239,9 +252,15 @@ const LEVELS = [
         ],
         
         spikes: [
-            // Some hazards in the right area
-            { id: 'spike-right-1', x: 2400, y: 320, w: 32, h: 12, world: 'both' },
-            { id: 'spike-right-2', x: 2800, y: 320, w: 48, h: 12, world: 'light' }
+            // Triangular spikes attached to ground platforms
+            { id: 'left-ground-spikes', x: 300, y: 320, w: 64, h: 12, attachedTo: 'ground-left' },
+            { id: 'right-ground-spikes1', x: 2400, y: 320, w: 80, h: 12, attachedTo: 'ground-right' },
+            { id: 'right-ground-spikes2', x: 2800, y: 320, w: 96, h: 12, attachedTo: 'ground-right' },
+            
+            // Platform spikes (inherit world properties)
+            { id: 'left-platform-spikes', x: 420, y: 208, w: 48, h: 12, attachedTo: 'plat-left-2' },
+            { id: 'island-spikes', x: 1170, y: 268, w: 64, h: 12, attachedTo: 'island-platform' },
+            { id: 'right-platform-spikes', x: 2620, y: 248, w: 80, h: 12, attachedTo: 'plat-right-3' },
         ],
         
         doors: [
