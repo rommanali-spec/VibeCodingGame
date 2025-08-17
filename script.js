@@ -23,6 +23,10 @@ let currentLevelIndex = 0;
 let levelTimeMs = 0;
 let levelStartMonotonic = 0;
 
+// Run timer system
+let levelRunMs = 0; // Accumulator for level run time (reset on load/reset, incremented each frame)
+let levelBestMs = null; // Current level's best time (loaded from localStorage)
+
 // Camera system
 let camera = { x: 0, y: 0 };
 
@@ -138,6 +142,10 @@ const LevelManager = {
         levelTimeMs = 0;
         levelStartMonotonic = performance.now();
         
+        // Initialize run timer for this level
+        levelRunMs = 0;
+        levelBestMs = loadBestTime(index); // Read best time from localStorage
+        
         // Set spawn state
         currentWorld = level.spawn.world;
         player.x = level.spawn.x;
@@ -241,6 +249,9 @@ const LevelManager = {
         levelTimeMs = 0;
         levelStartMonotonic = performance.now();
         
+        // Reset run timer (death/manual reset)
+        levelRunMs = 0;
+        
         // Reset player to spawn
         currentWorld = level.spawn.world;
         player.x = level.spawn.x;
@@ -266,7 +277,18 @@ const LevelManager = {
     // Complete current level
     complete() {
         console.log('Level completed!');
-        // TODO: Add timer/record tracking here in next steps
+        
+        // Stop the run timer and check for new best time
+        const finalTime = levelRunMs;
+        console.log(`Level completed in: ${formatTime(finalTime)}`);
+        
+        // Save best time if this run was better (or no best exists)
+        if (levelBestMs === null || finalTime < levelBestMs) {
+            levelBestMs = finalTime;
+            saveBestTime(currentLevelIndex, finalTime);
+            console.log(`New best time: ${formatTime(finalTime)}`);
+        }
+        
         // TODO: Add level advancement logic here in next steps
         
         // For now, just restart the current level
@@ -338,6 +360,35 @@ function rectanglesOverlap(rect1, rect2) {
            rect1.x + rect1.width > rect2.x &&
            rect1.y < rect2.y + rect2.height &&
            rect1.y + rect1.height > rect2.y;
+}
+
+// Timer formatting utility - converts milliseconds to mm:ss:ms format
+function formatTime(milliseconds) {
+    const totalMs = Math.floor(milliseconds);
+    const minutes = Math.floor(totalMs / 60000);
+    const seconds = Math.floor((totalMs % 60000) / 1000);
+    const ms = totalMs % 1000;
+    
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${ms.toString().padStart(3, '0')}`;
+}
+
+// localStorage functions for best times
+function saveBestTime(levelIndex, timeMs) {
+    try {
+        localStorage.setItem(`bestTime_${levelIndex}`, timeMs.toString());
+    } catch (e) {
+        console.warn('Could not save best time to localStorage:', e);
+    }
+}
+
+function loadBestTime(levelIndex) {
+    try {
+        const saved = localStorage.getItem(`bestTime_${levelIndex}`);
+        return saved ? parseInt(saved, 10) : null;
+    } catch (e) {
+        console.warn('Could not load best time from localStorage:', e);
+        return null;
+    }
 }
 
 // Resolve horizontal collision with all solids (platforms + movers)
@@ -883,6 +934,9 @@ function gameLoop() {
     const dtMs = Math.min(dt * 1000, 1000/30); // Cap at 30fps minimum
     levelTimeMs += dtMs;
     
+    // Accumulate run timer for current level
+    levelRunMs += dtMs;
+    
     // 1) UPDATE MOVERS FIRST: Deterministic time-based positioning
     updateMovers();
     
@@ -1082,6 +1136,8 @@ function render() {
     ctx.restore();
     
     // Draw UI elements in screen coordinates (no camera transform)
+    renderTimerHUD();
+    
     if (DEBUG) {
         renderDebugOverlay();
     }
@@ -1306,7 +1362,19 @@ function renderDoors() {
     }
 }
 
-
+// Render timer HUD (live timer and best time)
+function renderTimerHUD() {
+    // Live run timer (top-left, large)
+    ctx.fillStyle = '#2D3436';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(formatTime(levelRunMs), 20, 40);
+    
+    // Best time (below live timer, smaller)
+    ctx.font = '16px Arial';
+    const bestTimeText = levelBestMs !== null ? `Best: ${formatTime(levelBestMs)}` : 'Best: — — : — — : — — —';
+    ctx.fillText(bestTimeText, 20, 65);
+}
 
 // Developer debug overlay (temporary for testing)
 function renderDebugOverlay() {
