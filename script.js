@@ -1182,6 +1182,12 @@ function render() {
     // Clear canvas
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     
+    // Draw sky background (before camera transform)
+    renderSkyBackground();
+    
+    // Draw background elements (clouds/stars) with parallax
+    renderBackgroundElements();
+    
     // Save context for camera transforms
     ctx.save();
     
@@ -1203,6 +1209,11 @@ function render() {
     ctx.lineWidth = 2;
     ctx.strokeRect(player.x, player.y, player.width, player.height);
     
+    // Draw atmospheric effects (mist/fog for dark world)
+    if (currentWorld === 'dark') {
+        renderDarkWorldMist();
+    }
+    
     // Restore context (back to screen coordinates)
     ctx.restore();
     
@@ -1219,7 +1230,8 @@ function render() {
     }
     
     // Draw controls info
-    ctx.fillStyle = '#2D3436';
+    const textColor = currentWorld === 'light' ? '#2D3436' : '#FFFFFF';
+    ctx.fillStyle = textColor;
     ctx.font = '16px Arial';
     if (DEBUG) {
         ctx.fillText('Controls: A/D (move), W (jump), SPACE (swap), R (reset), 1/2/3 (levels)', 10, 30);
@@ -1244,6 +1256,137 @@ function isInViewport(obj) {
            obj.y + (obj.height || obj.h) > viewTop;
 }
 
+// Render sky background gradient based on current world
+function renderSkyBackground() {
+    let gradient;
+    if (currentWorld === 'light') {
+        // Light world: Bright sky-blue gradient
+        gradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+        gradient.addColorStop(0, '#87CEEB');    // Sky blue at top
+        gradient.addColorStop(0.6, '#98D8E8');  // Lighter blue
+        gradient.addColorStop(1, '#E0F6FF');    // Very light blue at horizon
+    } else {
+        // Dark world: Bluish-grey gradient
+        gradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+        gradient.addColorStop(0, '#1a1a2e');    // Dark blue-grey at top
+        gradient.addColorStop(0.5, '#2d3561');  // Medium blue-grey
+        gradient.addColorStop(1, '#4a5f7a');    // Lighter blue-grey at horizon
+    }
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+}
+
+// Render background elements (clouds/stars/moon) with parallax
+function renderBackgroundElements() {
+    ctx.save();
+    
+    if (currentWorld === 'light') {
+        // Light world: Draw clouds with parallax
+        const cloudParallax = camera.x * 0.3; // Clouds move slower than foreground
+        
+        // Simple cloud shapes
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        
+        // Cloud 1
+        drawCloud(100 - cloudParallax % (CANVAS_WIDTH + 200), 50, 60);
+        
+        // Cloud 2
+        drawCloud(300 - cloudParallax % (CANVAS_WIDTH + 200), 80, 45);
+        
+        // Cloud 3
+        drawCloud(500 - cloudParallax % (CANVAS_WIDTH + 200), 40, 55);
+        
+        // Cloud 4
+        drawCloud(700 - cloudParallax % (CANVAS_WIDTH + 200), 70, 50);
+        
+    } else {
+        // Dark world: Draw stars and moon
+        
+        // Moon
+        const moonX = CANVAS_WIDTH - 100;
+        const moonY = 60;
+        ctx.fillStyle = '#F0E68C';
+        ctx.beginPath();
+        ctx.arc(moonX, moonY, 25, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Moon craters
+        ctx.fillStyle = '#E0D68C';
+        ctx.beginPath();
+        ctx.arc(moonX - 8, moonY - 5, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(moonX + 6, moonY + 8, 4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Stars (static positions but twinkle effect)
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        const time = levelTimeMs / 1000;
+        
+        // Draw multiple stars
+        for (let i = 0; i < 20; i++) {
+            const x = (i * 73 + 37) % CANVAS_WIDTH;
+            const y = (i * 41 + 20) % (CANVAS_HEIGHT / 2);
+            const twinkle = Math.sin(time * 2 + i) * 0.3 + 0.7;
+            
+            ctx.save();
+            ctx.globalAlpha = twinkle;
+            ctx.fillRect(x, y, 2, 2);
+            ctx.restore();
+        }
+    }
+    
+    ctx.restore();
+}
+
+// Helper function to draw a cloud
+function drawCloud(x, y, size) {
+    // Draw cloud using multiple circles
+    ctx.beginPath();
+    ctx.arc(x, y, size * 0.5, 0, Math.PI * 2);
+    ctx.arc(x + size * 0.4, y, size * 0.6, 0, Math.PI * 2);
+    ctx.arc(x + size * 0.8, y, size * 0.5, 0, Math.PI * 2);
+    ctx.arc(x + size * 0.2, y - size * 0.2, size * 0.4, 0, Math.PI * 2);
+    ctx.arc(x + size * 0.6, y - size * 0.2, size * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+// Render dark world atmospheric mist/fog effect
+function renderDarkWorldMist() {
+    const level = LevelManager.getCurrent();
+    if (!level) return;
+    
+    ctx.save();
+    
+    // Ground-level mist
+    const mistHeight = 60;
+    const mistY = level.meta.height - mistHeight;
+    
+    // Create gradient for mist
+    const gradient = ctx.createLinearGradient(0, mistY, 0, mistY + mistHeight);
+    gradient.addColorStop(0, 'rgba(148, 130, 180, 0)');
+    gradient.addColorStop(0.5, 'rgba(148, 130, 180, 0.2)');
+    gradient.addColorStop(1, 'rgba(148, 130, 180, 0.4)');
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(camera.x, mistY, CANVAS_WIDTH, mistHeight);
+    
+    // Shadow particles floating upward (keeping these for subtle atmosphere)
+    const time = levelTimeMs / 1000;
+    ctx.fillStyle = 'rgba(100, 80, 120, 0.4)';
+    for (let i = 0; i < 5; i++) {
+        const baseX = camera.x + (i * 140 + 70);
+        const x = baseX + Math.sin(time * 0.8 + i * 3) * 30;
+        const y = mistY - 30 - ((time * 30 + i * 50) % 200);
+        
+        ctx.globalAlpha = 0.3 * (1 - (y - (mistY - 230)) / 200);
+        ctx.fillRect(x, y, 3, 8);
+    }
+    
+    ctx.restore();
+}
+
 // Render platforms based on current world (with culling)
 function renderPlatforms() {
     const activePlatforms = platforms.filter(platform => 
@@ -1252,29 +1395,184 @@ function renderPlatforms() {
     );
     
     for (const platform of activePlatforms) {
-        // Set color based on world type
-        switch (platform.world) {
-            case 'both':
-                ctx.fillStyle = '#808080'; // Neutral gray
-                break;
-            case 'light':
-                ctx.fillStyle = '#E6D56E'; // Warm yellowish
-                break;
-            case 'dark':
-                ctx.fillStyle = '#8E7BB8'; // Cool purplish
-                break;
-            default:
-                ctx.fillStyle = '#CCCCCC'; // Fallback gray
+        // Check if this is ground (large platform at bottom of level)
+        const isGround = platform.id && (platform.id.includes('ground') || 
+                                         platform.y >= 320 && platform.width >= 400);
+        
+        if (isGround) {
+            // Ground renders based on CURRENT world, not platform world
+            if (currentWorld === 'light') {
+                renderGrassPlatform(platform);
+            } else {
+                renderRockyPlatform(platform);
+            }
+        } else if (platform.world === 'both') {
+            // Both-world platforms: simple neutral gray (no glow)
+            renderBothWorldPlatform(platform);
+        } else if (platform.world === 'light') {
+            // Light world platforms: green grass tiles
+            renderGrassPlatform(platform);
+        } else if (platform.world === 'dark') {
+            // Dark world platforms: purple rocky tiles
+            renderRockyPlatform(platform);
         }
-        
-        // Draw platform
-        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
-        
-        // Draw platform border for clarity
-        ctx.strokeStyle = '#333333';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
     }
+}
+
+// Render a both-world platform - simple neutral gray
+function renderBothWorldPlatform(platform) {
+    // Main platform body - neutral gray (distinct from world-specific colors)
+    ctx.fillStyle = '#707070';
+    ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+    
+    // Simple border for definition
+    ctx.strokeStyle = '#505050';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
+}
+
+// Render a grass platform with pixel details
+function renderGrassPlatform(platform) {
+    // Base green color
+    ctx.fillStyle = '#4CAF50';
+    ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+    
+    // Add grass texture details
+    const tileSize = 16;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(platform.x, platform.y, platform.width, platform.height);
+    ctx.clip();
+    
+    for (let x = platform.x; x < platform.x + platform.width; x += tileSize) {
+        for (let y = platform.y; y < platform.y + platform.height; y += tileSize) {
+            // Darker green base
+            ctx.fillStyle = '#388E3C';
+            ctx.fillRect(x, y, tileSize, tileSize);
+            
+            // Grass blades
+            ctx.fillStyle = '#66BB6A';
+            // Random grass tufts
+            const grassPattern = (x + y) % 3;
+            if (grassPattern === 0) {
+                // Tall grass
+                ctx.fillRect(x + 2, y + 8, 1, 4);
+                ctx.fillRect(x + 5, y + 6, 1, 6);
+                ctx.fillRect(x + 8, y + 7, 1, 5);
+                ctx.fillRect(x + 11, y + 9, 1, 3);
+                ctx.fillRect(x + 14, y + 8, 1, 4);
+            } else if (grassPattern === 1) {
+                // Short grass
+                ctx.fillRect(x + 3, y + 10, 1, 2);
+                ctx.fillRect(x + 7, y + 9, 1, 3);
+                ctx.fillRect(x + 10, y + 10, 1, 2);
+                ctx.fillRect(x + 13, y + 11, 1, 1);
+            }
+            
+            // Tiny flowers (occasional)
+            if ((x + y * 2) % 7 === 0) {
+                ctx.fillStyle = '#FFEB3B';
+                ctx.fillRect(x + 6, y + 6, 2, 2);
+                ctx.fillStyle = '#FFC107';
+                ctx.fillRect(x + 6, y + 6, 1, 1);
+            } else if ((x * 3 + y) % 11 === 0) {
+                ctx.fillStyle = '#E91E63';
+                ctx.fillRect(x + 10, y + 7, 2, 2);
+            }
+            
+            // Dirt patches at bottom
+            if (y >= platform.y + platform.height - tileSize) {
+                ctx.fillStyle = '#6D4C41';
+                ctx.fillRect(x, y + tileSize - 4, tileSize, 4);
+                ctx.fillStyle = '#5D4037';
+                ctx.fillRect(x + 2, y + tileSize - 2, 3, 2);
+                ctx.fillRect(x + 8, y + tileSize - 3, 4, 2);
+            }
+        }
+    }
+    
+    ctx.restore();
+    
+    // Platform edge highlight
+    ctx.strokeStyle = '#2E7D32';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
+}
+
+// Render a rocky platform with cracks and glowing lines
+function renderRockyPlatform(platform) {
+    // Base purple-gray rock color
+    ctx.fillStyle = '#4A3C5C';
+    ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+    
+    // Add rocky texture
+    const tileSize = 16;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(platform.x, platform.y, platform.width, platform.height);
+    ctx.clip();
+    
+    for (let x = platform.x; x < platform.x + platform.width; x += tileSize) {
+        for (let y = platform.y; y < platform.y + platform.height; y += tileSize) {
+            // Rock base with variation
+            const variation = (x * 3 + y * 7) % 4;
+            if (variation === 0) {
+                ctx.fillStyle = '#5A4A6A';
+            } else if (variation === 1) {
+                ctx.fillStyle = '#4A3C5C';
+            } else {
+                ctx.fillStyle = '#3A2C4C';
+            }
+            ctx.fillRect(x, y, tileSize, tileSize);
+            
+            // Cracks
+            ctx.strokeStyle = '#2A1C3C';
+            ctx.lineWidth = 1;
+            const crackPattern = (x + y * 2) % 5;
+            if (crackPattern === 0) {
+                ctx.beginPath();
+                ctx.moveTo(x + 2, y + 4);
+                ctx.lineTo(x + 8, y + 10);
+                ctx.lineTo(x + 14, y + 8);
+                ctx.stroke();
+            } else if (crackPattern === 1) {
+                ctx.beginPath();
+                ctx.moveTo(x + 12, y + 2);
+                ctx.lineTo(x + 10, y + 8);
+                ctx.lineTo(x + 6, y + 14);
+                ctx.stroke();
+            }
+            
+            // Glowing energy lines (occasional)
+            if ((x * 2 + y) % 13 === 0) {
+                ctx.strokeStyle = '#9C27B0';
+                ctx.lineWidth = 1;
+                ctx.globalAlpha = 0.7;
+                ctx.beginPath();
+                ctx.moveTo(x + 4, y + tileSize);
+                ctx.lineTo(x + 4, y + tileSize - 4);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+            
+            // Crystal fragments (rare)
+            if ((x + y * 3) % 17 === 0) {
+                ctx.fillStyle = '#E91E63';
+                ctx.globalAlpha = 0.8;
+                ctx.fillRect(x + 7, y + 9, 3, 3);
+                ctx.fillStyle = '#F06292';
+                ctx.fillRect(x + 8, y + 10, 1, 1);
+                ctx.globalAlpha = 1;
+            }
+        }
+    }
+    
+    ctx.restore();
+    
+    // Platform edge
+    ctx.strokeStyle = '#311B92';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(platform.x, platform.y, platform.width, platform.height);
 }
 
 // Render moving platforms based on current world (with culling)
@@ -1285,29 +1583,51 @@ function renderMovers() {
     );
     
     for (const mover of activeMovers) {
-        // Set color based on world type (distinct from static platforms)
-        // Use semi-transparent fills to show they're solid colliders
-        switch (mover.world) {
-            case 'both':
-                ctx.fillStyle = 'rgba(102, 102, 102, 0.8)'; // Mid-gray with transparency
-                break;
-            case 'light':
-                ctx.fillStyle = 'rgba(212, 182, 54, 0.8)'; // Warm golden with transparency
-                break;
-            case 'dark':
-                ctx.fillStyle = 'rgba(123, 104, 163, 0.8)'; // Cool purple with transparency
-                break;
-            default:
-                ctx.fillStyle = 'rgba(153, 153, 153, 0.8)'; // Fallback gray
+        // Convert mover format to platform format for rendering
+        const platformFormat = {
+            x: mover.x,
+            y: mover.y,
+            width: mover.w,
+            height: mover.h,
+            world: mover.world,
+            id: mover.id
+        };
+        
+        // Check if this is a ground mover
+        const isGround = mover.id && (mover.id.includes('ground') || 
+                                      mover.y >= 320 && mover.w >= 400);
+        
+        if (isGround) {
+            // Ground movers render based on CURRENT world
+            if (currentWorld === 'light') {
+                renderGrassPlatform(platformFormat);
+            } else {
+                renderRockyPlatform(platformFormat);
+            }
+        } else if (mover.world === 'both') {
+            renderBothWorldPlatform(platformFormat);
+        } else if (mover.world === 'light') {
+            renderGrassPlatform(platformFormat);
+        } else if (mover.world === 'dark') {
+            renderRockyPlatform(platformFormat);
         }
         
-        // Draw mover as filled rectangle (not just outline)
-        ctx.fillRect(mover.x, mover.y, mover.w, mover.h);
+        // Add moving platform indicator (gears/arrows)
+        ctx.save();
+        // Use contrasting color for visibility
+        const indicatorColor = currentWorld === 'light' ? 'rgba(0, 0, 0, 0.3)' : 'rgba(255, 255, 255, 0.4)';
+        ctx.fillStyle = indicatorColor;
+        ctx.font = 'bold 10px Arial';
+        ctx.textAlign = 'center';
+        const centerX = mover.x + mover.w / 2;
+        const centerY = mover.y + mover.h / 2;
         
-        // Draw mover border for clarity
-        ctx.strokeStyle = '#222222';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(mover.x, mover.y, mover.w, mover.h);
+        if (mover.axis === 'horizontal') {
+            ctx.fillText('◄►', centerX, centerY + 3);
+        } else {
+            ctx.fillText('▲▼', centerX, centerY + 3);
+        }
+        ctx.restore();
         
         // Draw movement path (debug visualization)
         if (DEBUG) {
@@ -1476,8 +1796,11 @@ function renderDoors() {
 
 // Render timer HUD (live timer and best time)
 function renderTimerHUD() {
+    // Choose text color based on current world for readability
+    const textColor = currentWorld === 'light' ? '#2D3436' : '#FFFFFF';
+    
     // Live run timer (top-left, large)
-    ctx.fillStyle = '#2D3436';
+    ctx.fillStyle = textColor;
     ctx.font = 'bold 24px Arial';
     ctx.textAlign = 'left';
     ctx.fillText(formatTime(levelRunMs), 20, 40);
@@ -1516,7 +1839,8 @@ function renderCompletionMessage() {
 function renderDebugOverlay() {
     if (!DEBUG) return;
     
-    ctx.fillStyle = '#2D3436';
+    const textColor = currentWorld === 'light' ? '#2D3436' : '#FFFFFF';
+    ctx.fillStyle = textColor;
     ctx.font = '14px Arial';
     
     const currentLevel = LevelManager.getCurrent();
