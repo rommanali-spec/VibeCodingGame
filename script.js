@@ -984,8 +984,9 @@ function setupKeyboardControls() {
     document.addEventListener('keydown', (e) => {
         const key = e.key.toLowerCase();
         
-        // Handle number keys for level selection (1-3)
-        if (gameStarted && !countdownActive && !levelCompleting) {
+        // Handle number keys for level selection (1-3) and R for reset
+        if (gameStarted) {
+            // Level switching allowed during countdown
             if (e.key === '1') {
                 LevelManager.load(0);
                 e.preventDefault();
@@ -998,12 +999,18 @@ function setupKeyboardControls() {
                 LevelManager.load(2);
                 e.preventDefault();
                 return;
+            } else if (key === 'r' && !countdownActive && !levelCompleting) {
+                // R for reset only works during gameplay
+                LevelManager.reset();
+                e.preventDefault();
+                return;
             }
         }
         
         // Handle Space key for world swapping (edge detection)
         if (e.code === 'Space') {
-            if (!spaceKeyPressed && canSwapWorld()) {
+            // Disable swap during countdown
+            if (!countdownActive && !spaceKeyPressed && canSwapWorld()) {
                 swapWorld();
             }
             spaceKeyPressed = true;
@@ -1047,7 +1054,7 @@ function startGame() {
     
     try {
     gameStarted = true;
-
+    
     
         // Update UI - enter game mode
     startBtn.textContent = 'Game Running...';
@@ -1347,7 +1354,8 @@ function render() {
         renderCompletionMessage();
     }
     
-
+    // Render swap failed message if visible
+    renderSwapFailedMessage();
 }
 
 // Check if object AABB intersects viewport (for culling)
@@ -1885,7 +1893,6 @@ function renderTutorialText() {
     
     // Set up text styling
     ctx.save();
-    ctx.font = 'bold 24px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     
@@ -1915,17 +1922,25 @@ function renderTutorialText() {
             opacity = Math.max(0, Math.min(1, opacity));
         }
         
-        // Create semi-transparent background for readability
+        // Set font based on size from tutorial text
+        const fontSize = tutText.size || 18;
+        ctx.font = `bold ${fontSize}px monospace`;
+        
+        // Measure text for background sizing
         const textWidth = ctx.measureText(tutText.text).width;
+        const boxHeight = fontSize + 6; // Tighter padding for smaller text
+        const boxPadding = 6;
+        
+        // Create semi-transparent background for readability
         ctx.globalAlpha = opacity * 0.9;
         ctx.fillStyle = currentWorld === 'light' 
             ? 'rgba(255, 255, 255, 1)' 
             : 'rgba(0, 0, 0, 1)';
         ctx.fillRect(
-            tutText.x - textWidth/2 - 10, 
-            tutText.y - 15, 
-            textWidth + 20, 
-            30
+            tutText.x - textWidth/2 - boxPadding, 
+            tutText.y - boxHeight/2, 
+            textWidth + boxPadding * 2, 
+            boxHeight
         );
         
         // Draw border
@@ -1933,18 +1948,17 @@ function renderTutorialText() {
         ctx.strokeStyle = currentWorld === 'light' 
             ? 'rgba(46, 204, 113, 1)' 
             : 'rgba(155, 89, 182, 1)';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         ctx.strokeRect(
-            tutText.x - textWidth/2 - 10, 
-            tutText.y - 15, 
-            textWidth + 20, 
-            30
+            tutText.x - textWidth/2 - boxPadding, 
+            tutText.y - boxHeight/2, 
+            textWidth + boxPadding * 2, 
+            boxHeight
         );
         
         // Draw text
         ctx.globalAlpha = opacity;
         ctx.fillStyle = currentWorld === 'light' ? '#2D3436' : '#FFFFFF';
-        ctx.font = `bold ${tutText.size || 24}px monospace`;
         ctx.fillText(tutText.text, tutText.x, tutText.y);
     }
     
@@ -1953,9 +1967,6 @@ function renderTutorialText() {
 
 // Render timer HUD (live timer, best time, and level number)
 function renderTimerHUD() {
-    // Don't show timer during countdown
-    if (countdownActive) return;
-    
     // Choose text color based on current world for readability
     const textColor = currentWorld === 'light' ? '#2D3436' : '#FFFFFF';
     
@@ -1966,8 +1977,10 @@ function renderTimerHUD() {
     ctx.fillText(`Level ${currentLevelIndex + 1}`, 20, 25);
     
     // Live run timer (below level number, large)
+    // Show 00:00:000 during countdown, actual time during gameplay
     ctx.font = 'bold 24px Arial';
-    ctx.fillText(formatTime(levelRunMs), 20, 55);
+    const timerValue = countdownActive ? 0 : levelRunMs;
+    ctx.fillText(formatTime(timerValue), 20, 55);
     
     // Best time (below live timer, smaller)
     ctx.font = '16px Arial';
@@ -2091,65 +2104,53 @@ function renderSwapFailedMessage() {
     
     // Render message if visible
     if (swapFailedMessage.visible) {
-        ctx.fillStyle = '#FF4444';
-        ctx.font = 'bold 24px Arial';
+        ctx.save();
+        
+        // Position slightly above center to not interfere with gameplay
+        const messageX = CANVAS_WIDTH / 2;
+        const messageY = CANVAS_HEIGHT / 2 - 40;
+        const text = 'Swap Failed';
+        
+        // Set up text styling (matching tutorial text)
+        const fontSize = 18;
+        ctx.font = `bold ${fontSize}px monospace`;
         ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
         
-        // Draw text with white outline for visibility
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 4;
-        ctx.strokeText('Swap Failed', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+        // Measure text for background sizing
+        const textWidth = ctx.measureText(text).width;
+        const boxHeight = fontSize + 6; // Same padding as tutorial text
+        const boxPadding = 6;
         
-        ctx.fillText('Swap Failed', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+        // Create semi-transparent background for readability (matching tutorial)
+        ctx.fillStyle = currentWorld === 'light' 
+            ? 'rgba(255, 255, 255, 0.9)' 
+            : 'rgba(0, 0, 0, 0.9)';
+        ctx.fillRect(
+            messageX - textWidth/2 - boxPadding, 
+            messageY - boxHeight/2, 
+            textWidth + boxPadding * 2, 
+            boxHeight
+        );
         
-        // Reset text alignment
-        ctx.textAlign = 'left';
+        // Draw border (matching tutorial colors)
+        ctx.strokeStyle = currentWorld === 'light' 
+            ? 'rgba(46, 204, 113, 1)' 
+            : 'rgba(155, 89, 182, 1)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(
+            messageX - textWidth/2 - boxPadding, 
+            messageY - boxHeight/2, 
+            textWidth + boxPadding * 2, 
+            boxHeight
+        );
+        
+        // Draw text (matching tutorial colors)
+        ctx.fillStyle = currentWorld === 'light' ? '#2D3436' : '#FFFFFF';
+        ctx.fillText(text, messageX, messageY);
+        
+        ctx.restore();
     }
-}
-
-// Render tutorial text for Level 1
-function renderTutorialText() {
-    // Only render tutorial in Level 1
-    if (currentLevelIndex !== 0) return;
-    
-    const tutorialTexts = [
-        { text: "A = Left", x: 200, y: 200 },
-        { text: "D = Right", x: 500, y: 200 },
-        { text: "W = Jump", x: 800, y: 200 },
-        { text: "Space = Swap Worlds", x: 1200, y: 200 }
-    ];
-    
-    ctx.save();
-    
-    // Translate for camera but keep text in world space
-    ctx.translate(-camera.x, 0);
-    
-    // Set font style for tutorial text
-    ctx.font = 'bold 28px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    
-    // Render each tutorial text
-    for (const tutorial of tutorialTexts) {
-        // Only render if within camera view
-        if (tutorial.x >= camera.x - 200 && tutorial.x <= camera.x + CANVAS_WIDTH + 200) {
-            // Background for readability
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-            const textWidth = ctx.measureText(tutorial.text).width;
-            ctx.fillRect(tutorial.x - textWidth/2 - 20, tutorial.y - 25, textWidth + 40, 50);
-            
-            // Border for polish
-            ctx.strokeStyle = currentWorld === 'light' ? '#2ECC71' : '#9B59B6';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(tutorial.x - textWidth/2 - 20, tutorial.y - 25, textWidth + 40, 50);
-            
-            // Text with world-appropriate color
-            ctx.fillStyle = currentWorld === 'light' ? '#FFFFFF' : '#FFE74C';
-            ctx.fillText(tutorial.text, tutorial.x, tutorial.y);
-        }
-    }
-    
-    ctx.restore();
 }
 
 // Initialize when DOM is loaded

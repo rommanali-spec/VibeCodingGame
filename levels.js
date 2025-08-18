@@ -19,9 +19,9 @@ const LEVELS = [
         },
 
         platforms: [
-            // === TUTORIAL SECTION (0-1200px) ===
+            // === TUTORIAL SECTION (0-1300px) ===
             // Full ground for tutorial area
-            { id: 'ground-tutorial', x: 0, y: 332, w: 1200, h: 28, world: 'both' },
+            { id: 'ground-tutorial', x: 0, y: 332, w: 1300, h: 28, world: 'both' },
             
             // Small tutorial platforms to practice on
             { id: 'tutorial-plat1', x: 300, y: 280, w: 60, h: 12, world: 'both' },
@@ -29,16 +29,16 @@ const LEVELS = [
             { id: 'tutorial-plat3', x: 700, y: 250, w: 60, h: 12, world: 'dark' },
             { id: 'tutorial-plat4', x: 900, y: 280, w: 80, h: 12, world: 'both' },
             
-            // === SECTION 1: BASIC CHALLENGES (1200-2500px) ===
+            // === SECTION 1: BASIC CHALLENGES (1300-2500px) ===
             // First real gap with pit
-            { id: 'ground-1', x: 1300, y: 332, w: 400, h: 28, world: 'both' },
+            { id: 'ground-1', x: 1400, y: 332, w: 400, h: 28, world: 'both' },
             
             // Easy jump sequence
-            { id: 'intro1', x: 1800, y: 290, w: 80, h: 12, world: 'both' },
-            { id: 'intro2', x: 1950, y: 270, w: 80, h: 12, world: 'both' },
-            { id: 'intro3', x: 2100, y: 250, w: 80, h: 12, world: 'both' },
+            { id: 'intro1', x: 1900, y: 290, w: 80, h: 12, world: 'both' },
+            { id: 'intro2', x: 2050, y: 270, w: 80, h: 12, world: 'both' },
+            { id: 'intro3', x: 2200, y: 250, w: 80, h: 12, world: 'both' },
             
-            { id: 'ground-2', x: 2250, y: 332, w: 500, h: 28, world: 'both' },
+            { id: 'ground-2', x: 2350, y: 332, w: 400, h: 28, world: 'both' },
             
             // === SECTION 2: WORLD MECHANICS (2500-3800px) ===
             // Light-only platforms (need speed)
@@ -78,11 +78,10 @@ const LEVELS = [
 
         spikes: [
             // Spike demonstrations with proper gaps (60px+ between spike clusters)
-            { id: 'spike1', x: 2300, y: 320, w: 64, h: 12, attachedTo: 'ground-2' },
-            { id: 'spike2', x: 2430, y: 320, w: 64, h: 12, attachedTo: 'ground-2' },
+            { id: 'spike1', x: 2400, y: 320, w: 64, h: 12, attachedTo: 'ground-2' },
+            { id: 'spike2', x: 2530, y: 320, w: 64, h: 12, attachedTo: 'ground-2' },
             // 66px gap for safe landing
-            { id: 'spike3', x: 2560, y: 320, w: 64, h: 12, attachedTo: 'ground-2' },
-            { id: 'spike4', x: 2690, y: 320, w: 48, h: 12, attachedTo: 'ground-2' },
+            { id: 'spike3', x: 2660, y: 320, w: 64, h: 12, attachedTo: 'ground-2' },
             // On ground-3
             { id: 'spike5', x: 3700, y: 320, w: 64, h: 12, attachedTo: 'ground-3' },
             // 70px gap for safe landing
@@ -93,13 +92,21 @@ const LEVELS = [
 
         // Tutorial text (will be rendered in script.js)
         tutorialTexts: [
-            { x: 250, y: 200, text: "A = Left", size: 24, minX: 150, maxX: 350 },
-            { x: 500, y: 200, text: "D = Right", size: 24, minX: 400, maxX: 600 },
-            { x: 750, y: 180, text: "W = Jump", size: 24, minX: 650, maxX: 850 },
-            { x: 1000, y: 180, text: "Space = Swap Worlds", size: 24, minX: 900, maxX: 1100 },
-            { x: 1150, y: 200, text: "Light = Faster", size: 20, minX: 1100, maxX: 1200 },
-            { x: 1150, y: 230, text: "Dark = Float", size: 20, minX: 1100, maxX: 1200 },
-            { x: 1150, y: 260, text: "Use keys 1-3 to change levels", size: 18, minX: 1100, maxX: 1200 }
+            // Group 1: Basic movement (tightly stacked)
+            { x: 350, y: 185, text: "A = Left", size: 16, minX: 250, maxX: 450 },
+            { x: 350, y: 203, text: "D = Right", size: 16, minX: 250, maxX: 450 },
+            { x: 350, y: 221, text: "W = Jump", size: 16, minX: 250, maxX: 450 },
+            
+            // Group 2: World swap (with spacing)
+            { x: 650, y: 203, text: "Space = Swap Worlds", size: 16, minX: 550, maxX: 750 },
+            
+            // Group 3: Meta controls (tightly stacked)
+            { x: 900, y: 194, text: "R = Reset Level", size: 16, minX: 800, maxX: 1000 },
+            { x: 900, y: 212, text: "Keys 1-3 = Change Level", size: 16, minX: 800, maxX: 1000 },
+            
+            // Additional info (smaller)
+            { x: 1150, y: 194, text: "Light = Faster", size: 14, minX: 1050, maxX: 1250 },
+            { x: 1150, y: 212, text: "Dark = Float", size: 14, minX: 1050, maxX: 1250 }
         ],
 
         doors: [
