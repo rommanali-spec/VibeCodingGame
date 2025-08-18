@@ -139,39 +139,43 @@ const LEVELS = [
             // === SECTION 1: RHYTHM INTRO (0-2500px) ===
             { id: 'ground-start', x: 0, y: 332, w: 400, h: 28, world: 'both' },
             
-            // Rhythmic platform sequence
-            { id: 'rhythm1', x: 550, y: 280, w: 80, h: 12, world: 'light' },
-            { id: 'rhythm2', x: 750, y: 280, w: 80, h: 12, world: 'dark' },
-            { id: 'rhythm3', x: 950, y: 280, w: 80, h: 12, world: 'light' },
-            { id: 'rhythm4', x: 1150, y: 280, w: 80, h: 12, world: 'dark' },
-            { id: 'rhythm5', x: 1350, y: 280, w: 80, h: 12, world: 'light' },
+            // Rhythmic platform sequence (made easier with smaller gaps)
+            { id: 'rhythm1', x: 500, y: 280, w: 100, h: 12, world: 'light' },
+            { id: 'rhythm2', x: 680, y: 280, w: 100, h: 12, world: 'dark' },
+            { id: 'rhythm3', x: 860, y: 280, w: 100, h: 12, world: 'light' },
+            { id: 'rhythm4', x: 1040, y: 280, w: 100, h: 12, world: 'dark' },
+            { id: 'rhythm5', x: 1220, y: 280, w: 100, h: 12, world: 'light' },
+            { id: 'rhythm6', x: 1400, y: 280, w: 100, h: 12, world: 'both' },
             
             { id: 'ground-2', x: 1550, y: 332, w: 350, h: 28, world: 'both' },
             
             // === SECTION 2: MOVING PLATFORM CORRIDOR (2000-5000px) ===
             { id: 'corridor-start', x: 2000, y: 332, w: 200, h: 28, world: 'both' },
             
-            // Static platforms between movers
-            { id: 'static1', x: 2500, y: 280, w: 60, h: 12, world: 'light' },
-            { id: 'static2', x: 2900, y: 260, w: 60, h: 12, world: 'dark' },
-            { id: 'static3', x: 3300, y: 240, w: 60, h: 12, world: 'light' },
-            { id: 'static4', x: 3700, y: 220, w: 60, h: 12, world: 'dark' },
-            { id: 'static5', x: 4100, y: 260, w: 60, h: 12, world: 'light' },
-            { id: 'static6', x: 4500, y: 280, w: 60, h: 12, world: 'dark' },
+            // Static platforms between movers (wider for easier landing)
+            { id: 'static1', x: 2480, y: 280, w: 100, h: 12, world: 'light' },
+            { id: 'static2', x: 2880, y: 260, w: 100, h: 12, world: 'dark' },
+            { id: 'static3', x: 3280, y: 240, w: 100, h: 12, world: 'light' },
+            { id: 'static4', x: 3680, y: 220, w: 100, h: 12, world: 'dark' },
+            { id: 'static5', x: 4080, y: 260, w: 100, h: 12, world: 'light' },
+            { id: 'static6', x: 4480, y: 280, w: 100, h: 12, world: 'dark' },
             
             { id: 'ground-3', x: 4800, y: 332, w: 200, h: 28, world: 'both' },
             
             // === SECTION 3: MIDAIR SWAP CHALLENGE (5000-7500px) ===
-            // Long jumps requiring midair swaps
-            { id: 'launch1', x: 5150, y: 290, w: 80, h: 12, world: 'light' },
-            { id: 'catch1', x: 5450, y: 270, w: 80, h: 12, world: 'dark' },
+            // Easier jumps with helper platforms
+            { id: 'bridge-to-launch1', x: 5050, y: 310, w: 80, h: 12, world: 'both' },
+            { id: 'launch1', x: 5150, y: 290, w: 100, h: 12, world: 'light' },
+            { id: 'helper1', x: 5330, y: 280, w: 60, h: 12, world: 'both' },
+            { id: 'catch1', x: 5480, y: 270, w: 130, h: 12, world: 'dark' },
             
-            { id: 'launch2', x: 5750, y: 290, w: 80, h: 12, world: 'dark' },
-            { id: 'catch2', x: 6050, y: 270, w: 80, h: 12, world: 'light' },
+            { id: 'launch2', x: 5750, y: 290, w: 100, h: 12, world: 'dark' },
+            { id: 'helper2', x: 5920, y: 280, w: 60, h: 12, world: 'both' },
+            { id: 'catch2', x: 6070, y: 270, w: 120, h: 12, world: 'light' },
             
-            { id: 'launch3', x: 6350, y: 290, w: 60, h: 12, world: 'light' },
-            { id: 'midair1', x: 6550, y: 250, w: 50, h: 12, world: 'dark' },
-            { id: 'catch3', x: 6750, y: 270, w: 80, h: 12, world: 'light' },
+            { id: 'launch3', x: 6350, y: 290, w: 80, h: 12, world: 'light' },
+            { id: 'midair1', x: 6500, y: 270, w: 80, h: 12, world: 'dark' },
+            { id: 'catch3', x: 6650, y: 270, w: 100, h: 12, world: 'light' },
             
             { id: 'ground-4', x: 6950, y: 332, w: 250, h: 28, world: 'both' },
             
@@ -185,130 +189,129 @@ const LEVELS = [
             // === SECTION 5: FINALE (9500-11000px) ===
             { id: 'ground-5', x: 9100, y: 332, w: 200, h: 28, world: 'both' },
             
-            // Complex rhythm sequence
-            { id: 'finale1', x: 9400, y: 290, w: 50, h: 12, world: 'light' },
-            { id: 'finale2', x: 9500, y: 270, w: 50, h: 12, world: 'dark' },
-            { id: 'finale3', x: 9600, y: 250, w: 50, h: 12, world: 'light' },
-            { id: 'finale4', x: 9700, y: 230, w: 50, h: 12, world: 'dark' },
-            { id: 'finale5', x: 9800, y: 210, w: 50, h: 12, world: 'light' },
-            { id: 'finale6', x: 9900, y: 230, w: 50, h: 12, world: 'dark' },
-            { id: 'finale7', x: 10000, y: 250, w: 50, h: 12, world: 'light' },
-            { id: 'finale8', x: 10100, y: 270, w: 50, h: 12, world: 'dark' },
+            // Easier finale sequence with wider platforms
+            { id: 'finale1', x: 9400, y: 290, w: 80, h: 12, world: 'light' },
+            { id: 'finale2', x: 9530, y: 280, w: 80, h: 12, world: 'dark' },
+            { id: 'finale3', x: 9660, y: 270, w: 80, h: 12, world: 'light' },
+            { id: 'finale4', x: 9790, y: 260, w: 80, h: 12, world: 'dark' },
+            { id: 'finale5', x: 9920, y: 250, w: 80, h: 12, world: 'light' },
+            { id: 'finale6', x: 10050, y: 260, w: 80, h: 12, world: 'dark' },
+            { id: 'finale7', x: 10180, y: 270, w: 80, h: 12, world: 'both' },
             
             { id: 'ground-end', x: 10250, y: 332, w: 750, h: 28, world: 'both' }
         ],
 
         movers: [
-            // Corridor movers - carefully timed
+            // Corridor movers - easier timing
             {
                 id: 'corridor-mover1',
-                x: 2300, y: 280, w: 80, h: 12,
+                x: 2100, y: 280, w: 100, h: 12,
                 world: 'both',
                 axis: 'horizontal',
-                from: { x: 2300, y: 280 },
+                from: { x: 2100, y: 280 },
                 to: { x: 2700, y: 280 },
-                cycleMs: 3000
+                cycleMs: 4000
             },
             {
                 id: 'corridor-mover2',
-                x: 2700, y: 260, w: 80, h: 12,
+                x: 2700, y: 260, w: 100, h: 12,
                 world: 'both',
                 axis: 'horizontal',
                 from: { x: 2700, y: 260 },
                 to: { x: 3100, y: 260 },
-                cycleMs: 3000
+                cycleMs: 4000
             },
             {
                 id: 'corridor-mover3',
-                x: 3100, y: 240, w: 80, h: 12,
+                x: 3100, y: 240, w: 100, h: 12,
                 world: 'both',
                 axis: 'horizontal',
                 from: { x: 3100, y: 240 },
                 to: { x: 3500, y: 240 },
-                cycleMs: 3000
+                cycleMs: 4000
             },
             {
                 id: 'corridor-mover4',
-                x: 3500, y: 220, w: 80, h: 12,
+                x: 3500, y: 220, w: 100, h: 12,
                 world: 'both',
                 axis: 'horizontal',
                 from: { x: 3500, y: 220 },
                 to: { x: 3900, y: 220 },
-                cycleMs: 3000
+                cycleMs: 4000
             },
             {
                 id: 'corridor-mover5',
-                x: 3900, y: 260, w: 80, h: 12,
+                x: 3900, y: 260, w: 100, h: 12,
                 world: 'both',
                 axis: 'horizontal',
                 from: { x: 3900, y: 260 },
                 to: { x: 4300, y: 260 },
-                cycleMs: 3000
+                cycleMs: 4000
             },
             {
                 id: 'corridor-mover6',
-                x: 4300, y: 280, w: 80, h: 12,
+                x: 4300, y: 280, w: 100, h: 12,
                 world: 'both',
                 axis: 'horizontal',
                 from: { x: 4300, y: 280 },
                 to: { x: 4700, y: 280 },
-                cycleMs: 3000
+                cycleMs: 4000
             },
             
-            // Synchronized vertical movers
+            // Synchronized vertical movers (slower for easier timing)
             {
                 id: 'sync-mover1',
-                x: 7600, y: 200, w: 60, h: 12,
+                x: 7600, y: 200, w: 80, h: 12,
                 world: 'light',
                 axis: 'vertical',
                 from: { x: 7600, y: 200 },
                 to: { x: 7600, y: 320 },
-                cycleMs: 2500
+                cycleMs: 3500
             },
             {
                 id: 'sync-mover2',
-                x: 7700, y: 320, w: 60, h: 12,
+                x: 7700, y: 320, w: 80, h: 12,
                 world: 'dark',
                 axis: 'vertical',
                 from: { x: 7700, y: 320 },
                 to: { x: 7700, y: 200 },
-                cycleMs: 2500
+                cycleMs: 3500
             },
             {
                 id: 'sync-mover3',
-                x: 8100, y: 200, w: 60, h: 12,
+                x: 8100, y: 200, w: 80, h: 12,
                 world: 'light',
                 axis: 'vertical',
                 from: { x: 8100, y: 200 },
                 to: { x: 8100, y: 320 },
-                cycleMs: 2500
+                cycleMs: 3500
             },
             {
                 id: 'sync-mover4',
-                x: 8200, y: 320, w: 60, h: 12,
+                x: 8200, y: 320, w: 80, h: 12,
                 world: 'dark',
                 axis: 'vertical',
                 from: { x: 8200, y: 320 },
                 to: { x: 8200, y: 200 },
-                cycleMs: 2500
+                cycleMs: 3500
             },
             {
                 id: 'sync-mover5',
-                x: 8600, y: 200, w: 60, h: 12,
+                x: 8600, y: 200, w: 80, h: 12,
                 world: 'light',
                 axis: 'vertical',
                 from: { x: 8600, y: 200 },
                 to: { x: 8600, y: 320 },
-                cycleMs: 2500
+                cycleMs: 3500
             },
             {
                 id: 'sync-mover6',
-                x: 8700, y: 320, w: 60, h: 12,
+                x: 8700, y: 320, w: 80, h: 12,
                 world: 'dark',
                 axis: 'vertical',
                 from: { x: 8700, y: 320 },
                 to: { x: 8700, y: 200 },
-                cycleMs: 2500
+                cycleMs: 3500
             }
         ],
 

@@ -1965,7 +1965,7 @@ function renderTutorialText() {
     ctx.restore();
 }
 
-// Render timer HUD (live timer, best time, and level number)
+// Render timer HUD (live timer, best time, level number, and progress)
 function renderTimerHUD() {
     // Choose text color based on current world for readability
     const textColor = currentWorld === 'light' ? '#2D3436' : '#FFFFFF';
@@ -1986,6 +1986,14 @@ function renderTimerHUD() {
     ctx.font = '16px Arial';
     const bestTimeText = levelBestMs !== null ? `Best: ${formatTime(levelBestMs)}` : 'Best: — — : — — : — — —';
     ctx.fillText(bestTimeText, 20, 80);
+    
+    // Progress percentage (below best time)
+    const level = LevelManager.getCurrent();
+    if (level && level.meta) {
+        const progress = Math.max(0, Math.min(100, Math.floor((player.x / level.meta.width) * 100)));
+        ctx.font = 'bold 18px Arial';
+        ctx.fillText(`Progress: ${progress}%`, 20, 105);
+    }
 }
 
 // Render countdown overlay
