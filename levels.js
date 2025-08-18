@@ -173,11 +173,15 @@ const LEVELS = [
             { id: 'helper2', x: 5920, y: 280, w: 60, h: 12, world: 'both' },
             { id: 'catch2', x: 6070, y: 270, w: 120, h: 12, world: 'light' },
             
-            { id: 'launch3', x: 6350, y: 290, w: 80, h: 12, world: 'light' },
-            { id: 'midair1', x: 6500, y: 270, w: 80, h: 12, world: 'dark' },
-            { id: 'catch3', x: 6650, y: 270, w: 100, h: 12, world: 'light' },
+            { id: 'launch3', x: 6330, y: 290, w: 100, h: 12, world: 'light' },
+            { id: 'helper3', x: 6490, y: 275, w: 80, h: 12, world: 'both' },
+            { id: 'midair1', x: 6600, y: 270, w: 100, h: 12, world: 'dark' },
+            { id: 'catch3', x: 6750, y: 270, w: 100, h: 12, world: 'light' },
             
             { id: 'ground-4', x: 6950, y: 332, w: 250, h: 28, world: 'both' },
+            
+            // Bridge platform at 66%
+            { id: 'bridge-66', x: 7260, y: 290, w: 100, h: 12, world: 'dark' },
             
             // === SECTION 4: SYNCHRONIZED MOVERS (7500-9500px) ===
             // Static platforms for mover section
@@ -329,15 +333,7 @@ const LEVELS = [
             
             { id: 'spike6', x: 4850, y: 320, w: 64, h: 12, attachedTo: 'ground-3' },
             // 66px gap
-            { id: 'spike7', x: 4980, y: 320, w: 16, h: 12, attachedTo: 'ground-3' },
-            
-            { id: 'spike8', x: 7000, y: 320, w: 64, h: 12, attachedTo: 'ground-4' },
-            // 70px gap
-            { id: 'spike9', x: 7134, y: 320, w: 64, h: 12, attachedTo: 'ground-4' },
-            
-            { id: 'spike10', x: 9150, y: 320, w: 48, h: 12, attachedTo: 'ground-5' },
-            // 62px gap
-            { id: 'spike11', x: 9260, y: 320, w: 32, h: 12, attachedTo: 'ground-5' }
+            { id: 'spike7', x: 4980, y: 320, w: 16, h: 12, attachedTo: 'ground-3' }
         ],
 
         doors: [
@@ -351,12 +347,12 @@ const LEVELS = [
     },
 
     // ==========================================
-    // LEVEL 3: GAUNTLET (10000px ultimate challenge)
+    // LEVEL 3: GAUNTLET (8110px challenge)
     // ==========================================
     {
         meta: { 
             name: "Gauntlet", 
-            width: 10000, 
+            width: 8110, 
             height: 360 
         },
         
@@ -405,6 +401,9 @@ const LEVELS = [
             
             { id: 'ground-3', x: 3050, y: 332, w: 300, h: 28, world: 'both' },
             
+            // Bridge from 31.8% to 35.1%
+            { id: 'bridge-31to35', x: 3380, y: 325, w: 100, h: 12, world: 'both' },
+            
             // === SECTION 3: ALTERNATING STAIRCASES (3500-5500px) ===
             // Light-only ascending staircase
             { id: 'light-stair1', x: 3500, y: 320, w: 60, h: 12, world: 'light' },
@@ -426,6 +425,9 @@ const LEVELS = [
             
             { id: 'ground-4', x: 5250, y: 332, w: 300, h: 28, world: 'both' },
             
+            // Bridge from 53.8% to 57.1%
+            { id: 'bridge-53to57', x: 5580, y: 310, w: 100, h: 12, world: 'both' },
+            
             // === SECTION 4: MOVING CHAOS (5800-7800px) ===
             // Static platforms between movers
             { id: 'chaos-start', x: 5700, y: 280, w: 60, h: 12, world: 'both' },
@@ -436,22 +438,8 @@ const LEVELS = [
             { id: 'chaos-mid5', x: 7400, y: 260, w: 50, h: 12, world: 'light' },
             { id: 'chaos-end', x: 7700, y: 280, w: 100, h: 12, world: 'both' },
             
-            { id: 'ground-5', x: 7900, y: 332, w: 200, h: 28, world: 'both' },
-            
-            // === SECTION 5: TRIPLE-SWAP FINALE (8200-10000px) ===
-            // Launch platform
-            { id: 'finale-start', x: 8200, y: 290, w: 80, h: 12, world: 'light' },
-            
-            // Triple swap sequence
-            { id: 'triple1', x: 8400, y: 250, w: 50, h: 12, world: 'dark' },
-            { id: 'triple2', x: 8550, y: 210, w: 50, h: 12, world: 'light' },
-            { id: 'triple3', x: 8700, y: 170, w: 50, h: 12, world: 'dark' },
-            
-            // Final platform before exit
-            { id: 'finale-land', x: 8900, y: 200, w: 120, h: 12, world: 'both' },
-            
-            // Exit platform
-            { id: 'ground-end', x: 9200, y: 332, w: 800, h: 28, world: 'both' }
+            // End platform for exit door
+            { id: 'ground-end', x: 7900, y: 332, w: 210, h: 28, world: 'both' }
         ],
 
         movers: [
@@ -509,17 +497,6 @@ const LEVELS = [
                 from: { x: 7500, y: 280 },
                 to: { x: 7600, y: 280 },
                 cycleMs: 2000
-            },
-            
-            // Vertical mover for finale approach
-            {
-                id: 'finale-lift',
-                x: 9050, y: 200, w: 60, h: 12,
-                world: 'both',
-                axis: 'vertical',
-                from: { x: 9050, y: 200 },
-                to: { x: 9050, y: 320 },
-                cycleMs: 3000
             }
         ],
 
@@ -551,18 +528,14 @@ const LEVELS = [
             
             { id: 'spike13', x: 5300, y: 320, w: 64, h: 12, attachedTo: 'ground-4' },
             // 66px gap
-            { id: 'spike14', x: 5430, y: 320, w: 96, h: 12, attachedTo: 'ground-4' },
-            
-            { id: 'spike15', x: 7950, y: 320, w: 48, h: 12, attachedTo: 'ground-5' },
-            // 62px gap
-            { id: 'spike16', x: 8060, y: 320, w: 32, h: 12, attachedTo: 'ground-5' }
+            { id: 'spike14', x: 5430, y: 320, w: 96, h: 12, attachedTo: 'ground-4' }
         ],
 
         doors: [
             {
                 id: 'exit',
                 type: 'exit',
-                x: 9850, y: 280, w: 40, h: 52,
+                x: 8060, y: 280, w: 40, h: 52,
                 world: 'both'
             }
         ]

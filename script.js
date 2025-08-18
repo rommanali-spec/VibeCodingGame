@@ -954,9 +954,39 @@ function clearAllRecords() {
     keysToRemove.forEach(key => localStorage.removeItem(key));
 }
 
+// Clear all high scores from localStorage
+function clearAllHighScores() {
+    try {
+        // Clear old format keys
+        for (let i = 0; i < 10; i++) {
+            localStorage.removeItem(`bestTime_${i}`);
+        }
+        
+        // Clear new format keys for current host
+        for (let i = 0; i < 10; i++) {
+            localStorage.removeItem(`${window.location.host}:bestTime:${i}`);
+        }
+        
+        // Clear any other bestTime keys that might exist
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (key.includes('bestTime') || key.includes('Best'))) {
+                keysToRemove.push(key);
+            }
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+        
+        console.log('All high scores have been reset.');
+    } catch (e) {
+        console.error('Failed to clear high scores:', e);
+    }
+}
+
 // Initialize the game
 function init() {
-
+    // Reset all high scores on initialization
+    clearAllHighScores();
     
     // Migrate old localStorage keys if needed (automatic on first load of each level)
     
@@ -1990,9 +2020,10 @@ function renderTimerHUD() {
     // Progress percentage (below best time)
     const level = LevelManager.getCurrent();
     if (level && level.meta) {
-        const progress = Math.max(0, Math.min(100, Math.floor((player.x / level.meta.width) * 100)));
+        const progress = Math.max(0, Math.min(100, (player.x / level.meta.width) * 100));
+        const progressFormatted = progress.toFixed(1);
         ctx.font = 'bold 18px Arial';
-        ctx.fillText(`Progress: ${progress}%`, 20, 105);
+        ctx.fillText(`Progress: ${progressFormatted}%`, 20, 105);
     }
 }
 
